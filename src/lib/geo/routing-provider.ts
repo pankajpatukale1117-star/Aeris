@@ -1,7 +1,9 @@
 /**
  * AERIS Route & Distance Telemetry Provider
- * Uses OSRM (Open Source Routing Machine) for real road network routing,
- * distances, and road geometries.
+ * Supports:
+ * 1. Google Routes API v2 (ComputeRoutes) when GOOGLE_MAPS_API_KEY or INTERACTIVE_ROUTE_API_KEY is present
+ * 2. OSRM (Open Source Routing Machine) road network routing
+ * 3. Geodesic Haversine calculation with road curvature multiplier as resilient fallback
  */
 
 export interface RouteWaypoint {
@@ -28,7 +30,7 @@ export interface RouteResult {
   durationFormatted: string
   coordinates: Array<[number, number]> // [lat, lng] pairs for Leaflet Polyline
   legs: RouteLeg[]
-  dataSource: "osrm_road_network" | "haversine_estimate"
+  dataSource: "google_routes_v2" | "osrm_road_network" | "haversine_estimate"
   isLiveTraffic: false
   disclaimer: string
 }
@@ -62,6 +64,42 @@ function haversineDistanceMeters(lat1: number, lon1: number, lat2: number, lon2:
   return R * c
 }
 
+// Standard Google polyline decoder to [lat, lng] coordinates for Leaflet
+function decodePolyline(encoded: string): Array<[number, number]> {
+  if (!encoded) return []
+  const points: Array<[number, number]> = []
+  let index = 0
+  const len = encoded.length
+  let lat = 0
+  let lng = 0
+
+  while (index < len) {
+    let b: number
+    let shift = 0
+    let result = 0
+    do {
+      b = encoded.charCodeAt(index++) - 63
+      result |= (b & 0x1f) << shift
+      shift += 5
+    } while (b >= 0x20)
+    const dlat = result & 1 ? ~(result >> 1) : result >> 1
+    lat += dlat
+
+    shift = 0
+    result = 0
+    do {
+      b = encoded.charCodeAt(index++) - 63
+      result |= (b & 0x1f) << shift
+      shift += 5
+    } while (b >= 0x20)
+    const dlng = result & 1 ? ~(result >> 1) : result >> 1
+    lng += dlng
+
+    points.push([Number((lat / 1e5).toFixed(5)), Number((lng / 1e5).toFixed(5))])
+  }
+  return points
+}
+
 export async function calculateRoute(
   waypoints: RouteWaypoint[],
   mode: "driving" | "walking" | "bike" = "driving"
@@ -70,15 +108,105 @@ export async function calculateRoute(
     throw new Error("At least 2 waypoints are required to calculate a route.")
   }
 
-  // Format waypoints as lon,lat;lon,lat for OSRM / Route engines
-  const coordsString = waypoints.map((w) => `${w.lng},${w.lat}`).join(";")
+  const googleApiKey =
+    process.env.GOOGLE_MAPS_API_KEY ||
+    (process.env.INTERACTIVE_ROUTE_API_KEY?.startsWith("AIzaSy")
+      ? process.env.INTERACTIVE_ROUTE_API_KEY
+      : "")
 
-  const routeApiKey = process.env.INTERACTIVE_ROUTE_API_KEY || ""
+  // 1. Primary: Google Routes API v2 (if Google API key is configured)
+  if (googleApiKey) {
+    try {
+      const origin = waypoints[0]
+      const destination = waypoints[waypoints.length - 1]
+      const intermediates = waypoints.slice(1, -1).slice(0, 25) // Google allows up to 25 intermediates
+
+      const travelMode = mode === "walking" ? "WALK" : mode === "bike" ? "BICYCLE" : "DRIVE"
+
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 7000)
+
+      const payload: any = {
+        origin: { location: { latLng: { latitude: origin.lat, longitude: origin.lng } } },
+        destination: { location: { latLng: { latitude: destination.lat, longitude: destination.lng } } },
+        travelMode,
+      }
+
+      if (intermediates.length > 0) {
+        payload.intermediates = intermediates.map((w) => ({
+          location: { latLng: { latitude: w.lat, longitude: w.lng } },
+        }))
+      }
+
+      const res = await fetch("https://routes.googleapis.com/directions/v2:computeRoutes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": googleApiKey,
+          "X-Goog-FieldMask":
+            "routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline,routes.legs.distanceMeters,routes.legs.duration",
+        },
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timer))
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data.routes && data.routes.length > 0) {
+          const route = data.routes[0]
+          const distanceMeters = Math.round(route.distanceMeters || 0)
+          const durationSeconds = parseInt(String(route.duration || "0").replace("s", ""), 10)
+          const distanceKm = parseFloat((distanceMeters / 1000).toFixed(1))
+          const distanceMiles = parseFloat((distanceKm * 0.621371).toFixed(1))
+
+          const coordinates = decodePolyline(route.polyline?.encodedPolyline || "")
+
+          const legs: RouteLeg[] = (route.legs || []).map((leg: any, i: number) => {
+            const legDist = Math.round(leg.distanceMeters || 0)
+            const legDur = parseInt(String(leg.duration || "0").replace("s", ""), 10)
+            return {
+              fromName: waypoints[i]?.name,
+              toName: waypoints[i + 1]?.name,
+              distanceMeters: legDist,
+              durationSeconds: legDur,
+              distanceFormatted: formatDistance(legDist),
+              durationFormatted: formatDuration(legDur),
+            }
+          })
+
+          return {
+            distanceMeters,
+            durationSeconds,
+            distanceKm,
+            distanceMiles,
+            distanceFormatted: formatDistance(distanceMeters),
+            durationFormatted: formatDuration(durationSeconds),
+            coordinates: coordinates.length > 0 ? coordinates : waypoints.map((w) => [w.lat, w.lng]),
+            legs,
+            dataSource: "google_routes_v2",
+            isLiveTraffic: false,
+            disclaimer: "Calculated with Google Routes API high-precision telemetry.",
+          }
+        }
+      } else {
+        const errText = await res.text()
+        console.warn("Google Routes notice:", res.status, errText.slice(0, 150))
+      }
+    } catch (err) {
+      console.warn("Google Routes request notice:", err)
+    }
+  }
+
+  // 2. Secondary: OSRM (Open Source Routing Machine)
+  const coordsString = waypoints.map((w) => `${w.lng},${w.lat}`).join(";")
   const customEndpoint = process.env.INTERACTIVE_ROUTE_ENDPOINT || ""
+  const genericApiKey = process.env.INTERACTIVE_ROUTE_API_KEY || ""
 
   try {
     const baseUrl = customEndpoint || "https://router.project-osrm.org"
-    const url = `${baseUrl}/route/v1/${mode}/${coordsString}?overview=full&geometries=geojson&steps=false${routeApiKey ? `&key=${encodeURIComponent(routeApiKey)}` : ""}`
+    const url = `${baseUrl}/route/v1/${mode}/${coordsString}?overview=full&geometries=geojson&steps=false${
+      genericApiKey && !genericApiKey.startsWith("AIzaSy") ? `&key=${encodeURIComponent(genericApiKey)}` : ""
+    }`
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 7000)
@@ -86,7 +214,9 @@ export async function calculateRoute(
     const res = await fetch(url, {
       headers: {
         "User-Agent": "AERIS-Travel-Intelligence/2.0",
-        ...(routeApiKey ? { "x-api-key": routeApiKey, Authorization: `Bearer ${routeApiKey}` } : {}),
+        ...(genericApiKey && !genericApiKey.startsWith("AIzaSy")
+          ? { "x-api-key": genericApiKey, Authorization: `Bearer ${genericApiKey}` }
+          : {}),
       },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer))
@@ -133,7 +263,7 @@ export async function calculateRoute(
     console.warn("OSRM routing notice:", err)
   }
 
-  // Fallback: Haversine distance with 1.3 road winding curvature factor
+  // 3. Fallback: Haversine distance with 1.3 road winding curvature factor
   let totalMeters = 0
   const legs: RouteLeg[] = []
   const coordinates: Array<[number, number]> = waypoints.map((w) => [w.lat, w.lng])
@@ -176,4 +306,3 @@ export async function calculateRoute(
     disclaimer: "Estimated geodesic corridor distance. Real driving distances may vary based on terrain and tolls.",
   }
 }
-

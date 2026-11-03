@@ -1,5 +1,8 @@
 /**
  * AERIS Worldwide Geographical Provider Abstraction
+ * Supports:
+ * 1. Google Places API (New searchText) when GOOGLE_MAPS_API_KEY is available
+ * 2. OpenStreetMap Nominatim for open worldwide lookup and reverse-geocoding
  */
 
 export interface GeoLocation {
@@ -111,6 +114,73 @@ class NominatimGeoProvider implements IGeoProvider {
   }
 }
 
-// Export singleton instance of default provider
-export const geoProvider: IGeoProvider = new NominatimGeoProvider()
+class GooglePlacesGeoProvider implements IGeoProvider {
+  private fallback = new NominatimGeoProvider()
 
+  async search(query: string, limit: number = 5): Promise<GeoLocation[]> {
+    const trimmed = query.trim()
+    if (!trimmed) return []
+
+    const googleApiKey =
+      process.env.GOOGLE_MAPS_API_KEY ||
+      (process.env.INTERACTIVE_ROUTE_API_KEY?.startsWith("AIzaSy")
+        ? process.env.INTERACTIVE_ROUTE_API_KEY
+        : "")
+
+    if (googleApiKey) {
+      try {
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 6000)
+
+        const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Goog-Api-Key": googleApiKey,
+            "X-Goog-FieldMask":
+              "places.id,places.displayName,places.formattedAddress,places.location,places.types",
+          },
+          body: JSON.stringify({
+            textQuery: trimmed,
+            pageSize: Math.min(10, limit),
+          }),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timer))
+
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.places) && data.places.length > 0) {
+            return data.places.map((place: any) => {
+              const displayName = place.formattedAddress || place.displayName?.text || ""
+              const parts = displayName.split(",").map((s: string) => s.trim())
+              const country = parts.length > 0 ? parts[parts.length - 1] : ""
+
+              return {
+                id: String(place.id || `${place.location?.latitude},${place.location?.longitude}`),
+                name: place.displayName?.text || parts[0] || trimmed,
+                displayName,
+                lat: place.location?.latitude || 0,
+                lng: place.location?.longitude || 0,
+                type: place.types?.[0] || "location",
+                category: place.types?.[0] || "establishment",
+                country,
+              }
+            })
+          }
+        }
+      } catch (err) {
+        console.warn("Google Places search notice:", err)
+      }
+    }
+
+    // Resilient fallback to Nominatim
+    return this.fallback.search(trimmed, limit)
+  }
+
+  async reverseGeocode(lat: number, lng: number): Promise<GeoLocation | null> {
+    return this.fallback.reverseGeocode(lat, lng)
+  }
+}
+
+// Export singleton instance of default provider
+export const geoProvider: IGeoProvider = new GooglePlacesGeoProvider()
