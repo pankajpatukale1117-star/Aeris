@@ -114,6 +114,7 @@ interface ConversationMessage {
   role: "user" | "ai"
   text: string
   timestamp: string
+  timestampMs?: number
 }
 
 function AIPlannerContent() {
@@ -132,6 +133,9 @@ function AIPlannerContent() {
   const [lens, setLens] = React.useState("Architectural & Cultural Gems")
   const [currency, setCurrency] = React.useState<CurrencyCode>("USD")
 
+  // Synchronous lock to eliminate double-firing & duplicate messages
+  const isExecutingRef = React.useRef(false)
+
   // Multi-Turn Conversational Memory State
   const [conversationalInput, setConversationalInput] = React.useState("")
   const [conversationHistory, setConversationHistory] = React.useState<ConversationMessage[]>([
@@ -140,6 +144,7 @@ function AIPlannerContent() {
       role: "ai",
       text: "Greetings. I am AERIS's Multi-Turn Concierge Engine. Request any expedition on Earth in natural prose, or ask me to modify an existing itinerary on the fly (e.g. reduce walking for family, add authentic dining, or adjust daily budgets).",
       timestamp: "Just now",
+      timestampMs: Date.now(),
     },
   ])
 
@@ -214,22 +219,37 @@ function AIPlannerContent() {
     overrideLens?: string
   }) => {
     const { queryText, overrideDest, overrideDays, overridePace, overrideLens } = params
-    if (!queryText.trim() || loading) return
+    const trimmed = queryText.trim()
+    if (!trimmed || isExecutingRef.current) return
+    isExecutingRef.current = true
+    setLoading(true)
 
+    const nowMs = Date.now()
     const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    const userMsgId = `user-${nowMs}-${Math.random().toString(36).slice(2, 7)}`
 
-    // 1. Immediately append user message to multi-turn conversation memory
+    // 1. Immediately append user message with deduplication
     const userMsg: ConversationMessage = {
-      id: `user-${Date.now()}`,
+      id: userMsgId,
       role: "user",
-      text: queryText,
+      text: trimmed,
       timestamp: nowTime,
+      timestampMs: nowMs,
     }
 
-    const updatedHistory = [...conversationHistory, userMsg]
-    setConversationHistory(updatedHistory)
+    setConversationHistory((prev) => {
+      if (
+        prev.some(
+          (m) =>
+            m.id === userMsg.id ||
+            (m.role === "user" && m.text === trimmed && nowMs - (m.timestampMs || 0) < 1200)
+        )
+      ) {
+        return prev
+      }
+      return [...prev, userMsg]
+    })
     setConversationalInput("")
-    setLoading(true)
 
     const targetDest = overrideDest || destination
     const targetDays = overrideDays || days
@@ -244,8 +264,8 @@ function AIPlannerContent() {
           "x-gemini-key": apiKey || "",
         },
         body: JSON.stringify({
-          prompt: queryText,
-          message: queryText,
+          prompt: trimmed,
+          message: trimmed,
           destination: targetDest,
           days: targetDays,
           pace: targetPace,
@@ -253,7 +273,7 @@ function AIPlannerContent() {
           currency,
           apiKey,
           currentItinerary: itinerary,
-          history: updatedHistory.map((m) => ({
+          history: conversationHistory.map((m) => ({
             role: m.role === "user" ? "user" : "model",
             text: m.text,
           })),
@@ -261,39 +281,53 @@ function AIPlannerContent() {
       })
 
       const data = await res.json()
-      if (data.itinerary) {
+      const aiReply =
+        data.chatReply ||
+        data.itinerary?.chatReply ||
+        "I have updated your circadian flow."
+      const aiMsgId = `ai-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+
+      // 2. Append AI response with deduplication
+      setConversationHistory((prev) => {
+        if (prev.some((m) => m.id === aiMsgId)) return prev
+        return [
+          ...prev,
+          {
+            id: aiMsgId,
+            role: "ai",
+            text: aiReply,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            timestampMs: Date.now(),
+          },
+        ]
+      })
+
+      // 3. Intelligent Query Routing: only mutate itinerary if updated
+      if (data.hasItineraryUpdate !== false && data.itinerary) {
         setItinerary(data.itinerary)
         setSourceModel(data.source || (hasKey ? "gemini-2.5-flash" : "curated-sanctuary"))
         setSelectedDay(1)
         if (data.itinerary.name) setDestination(data.itinerary.name)
         if (data.itinerary.days?.length) setDays(data.itinerary.days.length)
 
-        // 2. Append AI Concierge response to conversation history
-        const aiReply = data.itinerary.chatReply || `I have updated your circadian flow for ${data.itinerary.name}.`
-        setConversationHistory((prev) => [
-          ...prev,
-          {
-            id: `ai-${Date.now()}`,
-            role: "ai",
-            text: aiReply,
-            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-          },
-        ])
-
         toast({
           title: itinerary ? "Itinerary Mutated" : "Itinerary Synthesized",
           description: `Circadian blueprint for ${data.itinerary.name} updated.`,
         })
       } else {
-        throw new Error(data.error || "Synthesis failed")
+        toast({
+          title: "Concierge Consulted",
+          description: "Insider advice provided.",
+        })
       }
     } catch (err: any) {
       console.warn("Client synthesis notice:", err)
       toast({
         title: "Synthesis Notice",
-        description: "Engaging AERIS High-Fidelity Universal Curated Engine.",
+        description: "Engaging AERIS Universal Curated Engine.",
       })
     } finally {
+      isExecutingRef.current = false
       setLoading(false)
     }
   }
@@ -335,6 +369,7 @@ function AIPlannerContent() {
         role: "ai",
         text: "Conversation refreshed. Tell me where you wish to explore next, or what specific experience you desire.",
         timestamp: "Just now",
+        timestampMs: Date.now(),
       },
     ])
     toast({
