@@ -20,7 +20,6 @@ import {
   Navigation,
 } from "lucide-react"
 import { DESTINATIONS } from "@/lib/constants"
-import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore } from "@/lib/store/travel-store"
 import { TripMap, MapPoint } from "@/components/map/trip-map"
@@ -67,11 +66,13 @@ export default function DestinationDetailPage() {
   if (!destination) {
     return (
       <div className="py-24 text-center space-y-4 max-w-md mx-auto">
-        <Compass className="w-12 h-12 text-[#78848C] mx-auto stroke-1" />
-        <h2 className="font-display text-2xl font-bold">Destination Not Found</h2>
-        <p className="text-xs text-[#78848C]">The destination you requested does not exist or has been archived.</p>
+        <Compass className="w-12 h-12 text-[#94a3b8] mx-auto stroke-1" />
+        <h2 className="font-editorial text-3xl font-bold text-white">Destination Not Found</h2>
+        <p className="text-xs text-[#94a3b8]">The sanctuary you requested does not exist or has been archived.</p>
         <Link href="/destinations">
-          <Button variant="outline" className="rounded-full text-xs">Return to Atlas</Button>
+          <button className="glass-pill px-6 py-2.5 rounded-full text-xs text-white hover:text-[#e8d5b5]">
+            Return to Atlas
+          </button>
         </Link>
       </div>
     )
@@ -120,68 +121,64 @@ export default function DestinationDetailPage() {
       <div className="flex items-center justify-between">
         <button
           onClick={() => router.back()}
-          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#78848C] hover:text-[#18232D] dark:hover:text-[#F8F7F4] transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#94a3b8] hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Atlas</span>
         </button>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleShare}
-            className="rounded-full text-xs gap-1.5 border-black/10 dark:border-white/10"
+            className="glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5"
           >
             <Share2 className="w-3.5 h-3.5" />
             <span>Share</span>
-          </Button>
+          </button>
 
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleToggleSave}
-            className="rounded-full text-xs gap-1.5 border-black/10 dark:border-white/10"
+            className="glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5"
           >
-            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? "fill-[#6D9D94] text-[#6D9D94]" : ""}`} />
+            <Bookmark className={`w-3.5 h-3.5 ${isSaved ? "fill-[#e8d5b5] text-[#e8d5b5]" : ""}`} />
             <span>{isSaved ? "Saved" : "Save"}</span>
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* Cinematic Showcase Banner */}
-      <div className="relative aspect-[16/9] md:aspect-[21/9] w-full rounded-3xl overflow-hidden shadow-2xl bg-[#101E2B]">
+      {/* Cinematic Showcase Banner (Rule 2: Strictly Bounded Image Container) */}
+      <div className="relative h-72 sm:h-96 md:h-[460px] w-full rounded-3xl overflow-hidden shadow-2xl glass-shell border border-white/15">
         <Image
           src={destination.image}
           alt={destination.name}
           fill
           priority
           sizes="100vw"
-          className="object-cover"
+          className="w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101E2B] via-[#101E2B]/40 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050a10] via-[#050a10]/40 to-transparent" />
 
-        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-6 z-10">
           <div className="space-y-2 max-w-xl">
             <div className="flex items-center gap-2">
-              <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#A5C7BA]">
+              <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#e8d5b5]">
                 {destination.category}
               </span>
               <span className="text-xs text-white/60">•</span>
               <span className="text-xs text-white/80 font-medium">{destination.continent}</span>
             </div>
 
-            <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl font-bold tracking-tight">
+            <h1 className="font-editorial text-4xl sm:text-6xl font-bold tracking-tight">
               {destination.name}
             </h1>
 
-            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-[#A5C7BA]">
-              <MapPin className="w-4 h-4" />
+            <div className="flex items-center gap-1.5 text-xs sm:text-sm text-[#e8d5b5]">
+              <MapPin className="w-4 h-4 text-[#38bdf8]" />
               <span>{destination.location}, {destination.country}</span>
             </div>
           </div>
 
-          <div className="glass-pill px-4 py-2 rounded-2xl flex items-center gap-2 text-amber-300 font-bold text-sm shrink-0">
+          <div className="glass-pill px-4 py-2 rounded-2xl flex items-center gap-2 text-[#e8d5b5] font-bold text-sm shrink-0 border-white/20">
             <Star className="w-4 h-4 fill-current" />
             <span>{destination.rating} Rating</span>
           </div>
@@ -193,25 +190,25 @@ export default function DestinationDetailPage() {
         {/* Left Column: Narrative, Highlights & Map */}
         <div className="lg:col-span-8 space-y-10">
           <div className="space-y-3">
-            <span className="editorial-tag">Overview</span>
-            <h2 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+            <span className="editorial-tag text-[#e8d5b5]">Overview</span>
+            <h2 className="font-editorial text-3xl font-bold text-white">
               The Character of {destination.name}
             </h2>
-            <p className="text-sm sm:text-base text-[#78848C] leading-relaxed font-normal">
+            <p className="text-sm sm:text-base text-[#94a3b8] leading-relaxed font-normal">
               {destination.description}
             </p>
           </div>
 
           {/* Highlights */}
           <div className="space-y-4">
-            <span className="editorial-tag">Curated Highlights</span>
+            <span className="editorial-tag text-[#e8d5b5]">Curated Highlights</span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {destination.highlights.map((highlight) => (
                 <div
                   key={highlight}
-                  className="p-4 rounded-2xl bg-card border border-black/[0.06] dark:border-white/[0.08] flex items-center gap-3 text-xs sm:text-sm font-medium"
+                  className="p-4 rounded-2xl glass-card flex items-center gap-3 text-xs sm:text-sm font-medium text-white"
                 >
-                  <CheckCircle2 className="w-4 h-4 text-[#6D9D94] shrink-0" />
+                  <CheckCircle2 className="w-4 h-4 text-[#38bdf8] shrink-0" />
                   <span>{highlight}</span>
                 </div>
               ))}
@@ -221,9 +218,9 @@ export default function DestinationDetailPage() {
           {/* Topographic & Regional Map */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="editorial-tag">Geographic Position</span>
-              <span className="text-xs text-[#78848C] flex items-center gap-1">
-                <Navigation className="w-3.5 h-3.5 text-[#6D9D94]" />
+              <span className="editorial-tag text-[#38bdf8]">Geographic Position</span>
+              <span className="text-xs text-[#94a3b8] flex items-center gap-1">
+                <Navigation className="w-3.5 h-3.5 text-[#38bdf8]" />
                 <span>{coords[0].toFixed(4)}° N, {coords[1].toFixed(4)}° E</span>
               </span>
             </div>
@@ -231,67 +228,67 @@ export default function DestinationDetailPage() {
               points={mapPoints}
               center={coords}
               zoom={11}
-              className="h-[320px] sm:h-[380px] w-full rounded-3xl overflow-hidden border border-black/[0.08] dark:border-white/[0.08] shadow-sm"
+              className="h-[320px] sm:h-[380px] w-full rounded-3xl overflow-hidden border border-white/15 shadow-2xl"
             />
           </div>
         </div>
 
         {/* Right Column: Planning Action Box */}
         <div className="lg:col-span-4 space-y-6">
-          <div className="glass-dock p-6 rounded-3xl border shadow-lg space-y-6 sticky top-28">
+          <div className="glass-dock p-6 rounded-3xl border border-white/20 shadow-2xl space-y-6 sticky top-28">
             <div className="space-y-3">
-              <span className="editorial-tag text-[#6D9D94]">Travel Specifications</span>
-              <h3 className="font-display text-xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+              <span className="editorial-tag text-[#e8d5b5]">Travel Specifications</span>
+              <h3 className="font-editorial text-2xl font-bold text-white">
                 At a Glance
               </h3>
 
               <div className="space-y-3 text-xs pt-1">
-                <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-[#78848C] flex items-center gap-1.5">
-                    <Clock className="w-3.5 h-3.5 text-[#6D9D94]" />
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-[#94a3b8] flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-[#38bdf8]" />
                     Suggested Duration
                   </span>
-                  <span className="font-semibold">{destination.recommendedDuration}</span>
+                  <span className="font-semibold text-white">{destination.recommendedDuration}</span>
                 </div>
 
-                <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-[#78848C] flex items-center gap-1.5">
-                    <DollarSign className="w-3.5 h-3.5 text-[#6D9D94]" />
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-[#94a3b8] flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-[#e8d5b5]" />
                     Estimated Budget
                   </span>
-                  <span className="font-semibold">{destination.approximateBudget}</span>
+                  <span className="font-semibold text-white">{destination.approximateBudget}</span>
                 </div>
 
-                <div className="flex items-center justify-between pb-2 border-b border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-[#78848C] flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#6D9D94]" />
+                <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                  <span className="text-[#94a3b8] flex items-center gap-1.5">
+                    <Calendar className="w-3.5 h-3.5 text-[#38bdf8]" />
                     Climate & Seasons
                   </span>
-                  <span className="font-semibold">Prime Window</span>
+                  <span className="font-semibold text-white">Prime Window</span>
                 </div>
               </div>
             </div>
 
             {/* CTAs */}
-            <div className="space-y-2.5 pt-2">
+            <div className="space-y-3 pt-2">
               <Link
                 href={`/ai-planner?destination=${encodeURIComponent(destination.name + ', ' + destination.country)}`}
                 className="w-full block"
               >
-                <Button className="w-full rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] text-white dark:text-[#101E2B] font-semibold py-6 text-xs gap-2 shadow-md">
-                  <Sparkles className="w-3.5 h-3.5 text-[#6D9D94] dark:text-[#101E2B]" />
+                <button className="w-full btn-luxe py-3.5 text-xs font-semibold gap-2 shadow-xl cursor-pointer">
+                  <Sparkles className="w-3.5 h-3.5 text-[#050a10]" />
                   <span>Synthesize AI Itinerary</span>
-                </Button>
+                </button>
               </Link>
 
               <Link
                 href={`/manual-planner?destination=${encodeURIComponent(destination.name + ', ' + destination.country)}`}
                 className="w-full block"
               >
-                <Button variant="outline" className="w-full rounded-full border-black/15 dark:border-white/20 py-6 text-xs font-semibold">
+                <button className="w-full glass-pill py-3.5 text-xs font-semibold text-white hover:text-[#e8d5b5] rounded-full flex items-center justify-center gap-1.5 cursor-pointer">
                   <span>Open Manual Studio</span>
-                  <ArrowRight className="w-3.5 h-3.5 ml-2" />
-                </Button>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#e8d5b5]" />
+                </button>
               </Link>
             </div>
           </div>

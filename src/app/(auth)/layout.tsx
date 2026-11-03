@@ -7,24 +7,24 @@ export default function AuthLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen flex flex-col justify-between bg-[#F8F7F4] dark:bg-[#101E2B] text-[#18232D] dark:text-[#F8F7F4] relative overflow-hidden">
+    <div className="min-h-screen flex flex-col justify-between bg-[#050a10] text-[#f1f5f9] relative overflow-hidden">
       {/* Background Ambient Glows */}
-      <div className="absolute -top-40 -right-40 w-96 h-96 bg-[#6D9D94]/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-[#A5C7BA]/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -top-40 -right-40 w-[32rem] h-[32rem] bg-gradient-to-br from-[#38bdf8]/15 via-[#e8d5b5]/10 to-transparent rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute -bottom-40 -left-40 w-[32rem] h-[32rem] bg-gradient-to-tr from-[#050a10] via-[#e8d5b5]/10 to-[#38bdf8]/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Header */}
       <header className="p-6 sm:p-8 flex justify-between items-center relative z-10 max-w-6xl mx-auto w-full">
-        <Link href="/" className="flex items-center gap-2 group">
-          <span className="font-display text-2xl font-bold tracking-tight text-[#101E2B] dark:text-[#F8F7F4]">
+        <Link href="/" className="flex items-center gap-2.5 group">
+          <span className="font-editorial text-2xl font-bold tracking-wider text-[#e8d5b5]">
             ROVEO
           </span>
-          <span className="w-1.5 h-1.5 rounded-full bg-[#6D9D94]" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]" />
         </Link>
         <Link
           href="/"
-          className="text-xs font-semibold uppercase tracking-wider text-[#78848C] hover:text-[#18232D] dark:hover:text-[#F8F7F4] transition-colors"
+          className="glass-pill px-4 py-2 text-xs uppercase tracking-widest text-slate-300 hover:text-white transition-all hover:border-[#38bdf8]/50"
         >
-          ← Return to Home
+          ← Return to Sanctuary
         </Link>
       </header>
 
@@ -34,8 +34,8 @@ export default function AuthLayout({
       </main>
 
       {/* Footer */}
-      <footer className="p-6 text-center text-xs text-[#78848C] relative z-10">
-        © {new Date().getFullYear()} ROVEO International Ltd. Protected by modern encryption.
+      <footer className="p-6 text-center text-xs text-slate-500 relative z-10">
+        © {new Date().getFullYear()} ROVEO International Concierge. High-fidelity cryptographic session security.
       </footer>
     </div>
   )

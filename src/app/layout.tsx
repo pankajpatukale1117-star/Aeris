@@ -4,33 +4,30 @@ import { ThemeProvider } from "@/components/providers/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: "ROVEO — Your journey, your way",
+  title: "ROVEO — Your Journey, Your Way | AI Travel Concierge & Interactive Atlas",
   description:
-    "Discover extraordinary destinations, create personalized travel itineraries with AI, or manually craft and customize your dream trips. Beautiful, intelligent, and seamless travel planning.",
+    "Luxury AI Travel Concierge & Interactive Atlas. Discover extraordinary sanctuaries, synthesize bespoke multi-day itineraries with intelligence, or craft custom routes with total autonomy.",
   keywords: [
-    "travel planner",
-    "AI trip planner",
-    "itinerary generator",
-    "vacation planning",
     "ROVEO",
+    "AI travel concierge",
     "luxury travel",
-    "travel guide",
+    "interactive atlas",
+    "trip architect",
+    "bespoke itineraries",
+    "liquid glassmorphism",
   ],
-  authors: [{ name: "ROVEO Travel Tech" }],
+  authors: [{ name: "ROVEO Travel Architecture" }],
   openGraph: {
-    title: "ROVEO — Your journey, your way",
+    title: "ROVEO — Your Journey, Your Way",
     description:
-      "Intelligent, bespoke travel planning powered by AI. Explore, plan, and travel on your terms.",
+      "Luxury AI Travel Concierge & Interactive Atlas with Liquid Glassmorphism UI.",
     type: "website",
     siteName: "ROVEO",
   },
 }
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#F7F8FA" },
-    { media: "(prefers-color-scheme: dark)", color: "#172B3A" },
-  ],
+  themeColor: "#050a10",
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
@@ -42,12 +39,49 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground min-h-screen flex flex-col selection:bg-[#64B5A7]/30 selection:text-[#172B3A] dark:selection:text-white">
+    <html lang="en" className="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
+          rel="stylesheet"
+        />
+        {/* Tailwind CDN as guaranteed fallback anti-breakage safeguard */}
+        <script src="https://cdn.tailwindcss.com"></script>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              tailwind.config = {
+                darkMode: 'class',
+                theme: {
+                  extend: {
+                    colors: {
+                      background: '#050a10',
+                      foreground: '#f1f5f9',
+                      champagne: {
+                        300: '#f3e8d2',
+                        400: '#e8d5b5',
+                        500: '#d4b483',
+                      },
+                      cyanLuxe: '#38bdf8',
+                    },
+                    fontFamily: {
+                      editorial: ['"Cormorant Garamond"', 'Georgia', 'serif'],
+                      sans: ['"Inter"', 'system-ui', 'sans-serif'],
+                    }
+                  }
+                }
+              }
+            `,
+          }}
+        />
+      </head>
+      <body className="font-sans antialiased bg-[#050a10] text-[#f1f5f9] min-h-screen flex flex-col selection:bg-[#e8d5b5]/30 selection:text-white">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
-          enableSystem
+          defaultTheme="dark"
+          forcedTheme="dark"
           disableTransitionOnChange
         >
           {children}

@@ -3,11 +3,9 @@
 import * as React from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { Lock, Mail, User, Phone, ArrowRight, Loader2, AlertCircle, CheckCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
+import { Lock, Mail, User, Phone, ArrowRight, Loader2, AlertCircle, CheckCircle, Sparkles } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
 import { useTravelStore } from "@/lib/store/travel-store"
@@ -19,7 +17,6 @@ export default function SignupPage() {
 
   const [fullName, setFullName] = React.useState("")
   const [email, setEmail] = React.useState("")
-  const [phone, setPhone] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [confirmPassword, setConfirmPassword] = React.useState("")
   const [termsAgreed, setTermsAgreed] = React.useState(false)
@@ -62,7 +59,6 @@ export default function SignupPage() {
         options: {
           data: {
             full_name: fullName,
-            phone: phone || null,
           },
         },
       })
@@ -76,8 +72,8 @@ export default function SignupPage() {
           signup(email, fullName)
           setIsSuccess(true)
           toast({
-            title: "Welcome to ROVEO",
-            description: "Opening your Travel Desk...",
+            title: "Membership Created",
+            description: "Opening your bespoke Travel Desk...",
           })
           setTimeout(() => router.push("/dashboard"), 800)
           return
@@ -97,7 +93,7 @@ export default function SignupPage() {
       signup(email, fullName)
       setIsSuccess(true)
       toast({
-        title: "Welcome to ROVEO (Verified Session)",
+        title: "Welcome to ROVEO",
         description: "Opening your Travel Desk...",
       })
       setTimeout(() => router.push("/dashboard"), 800)
@@ -107,58 +103,67 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="glass-dock border rounded-3xl p-7 sm:p-10 shadow-2xl space-y-6">
-      <div className="space-y-1.5 text-center">
-        <span className="editorial-tag text-[#6D9D94]">New Membership</span>
-        <h1 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-[#18232D] dark:text-[#F8F7F4]">
-          Begin Your Journey
+    <div className="glass-shell border border-white/10 rounded-3xl p-8 sm:p-10 shadow-2xl space-y-6 relative overflow-hidden backdrop-blur-2xl">
+      <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-bl from-[#38bdf8]/10 via-[#e8d5b5]/5 to-transparent blur-2xl pointer-events-none" />
+
+      <div className="space-y-2 text-center relative z-10">
+        <div className="inline-flex items-center gap-2 glass-pill px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-[#e8d5b5]">
+          <Sparkles className="w-3 h-3 text-[#38bdf8]" />
+          Exclusive Membership
+        </div>
+        <h1 className="font-editorial text-3xl sm:text-4xl font-medium tracking-tight text-white">
+          Begin Your <span className="italic text-[#e8d5b5]">Odyssey</span>
         </h1>
-        <p className="text-xs text-[#78848C]">
-          Create your ROVEO membership to craft bespoke itineraries.
+        <p className="text-xs text-slate-300 max-w-xs mx-auto font-light leading-relaxed">
+          Create your private ROVEO registry to craft autonomous itineraries and bookmark global sanctuaries.
         </p>
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive text-xs flex items-center gap-2">
-          <AlertCircle className="w-4 h-4 shrink-0" />
+        <div className="p-3.5 rounded-2xl bg-destructive/15 border border-destructive/30 text-rose-300 text-xs flex items-center gap-2 relative z-10">
+          <AlertCircle className="w-4 h-4 shrink-0 text-rose-400" />
           <span>{error}</span>
         </div>
       )}
 
       {isSuccess ? (
-        <div className="py-8 text-center space-y-3">
-          <div className="w-12 h-12 bg-[#A5C7BA]/20 text-[#6D9D94] rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle className="w-6 h-6" />
+        <div className="py-8 text-center space-y-3 relative z-10">
+          <div className="w-14 h-14 bg-[#38bdf8]/20 text-[#38bdf8] rounded-full flex items-center justify-center mx-auto border border-[#38bdf8]/40 shadow-[0_0_15px_rgba(56,189,248,0.3)]">
+            <CheckCircle className="w-7 h-7" />
           </div>
-          <h3 className="font-display text-xl font-bold">Membership Active</h3>
-          <p className="text-xs text-[#78848C]">Entering your personalized Travel Desk...</p>
+          <h3 className="font-editorial text-2xl font-medium text-white">Membership Activated</h3>
+          <p className="text-xs text-slate-400">Opening your personalized luxury Travel Desk...</p>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-3.5 relative z-10">
           <div className="space-y-1">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Full Name *</Label>
+            <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
+              Full Legal Name *
+            </label>
             <div className="relative">
-              <User className="w-4 h-4 text-[#78848C] absolute left-3.5 top-3.5" />
-              <Input
-                placeholder="Alexandra Scott"
+              <User className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
+                placeholder="Alexandra Sterling"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="pl-10 rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+                className="glass-input w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
                 required
               />
             </div>
           </div>
 
           <div className="space-y-1">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Email Address *</Label>
+            <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
+              Primary Email Address *
+            </label>
             <div className="relative">
-              <Mail className="w-4 h-4 text-[#78848C] absolute left-3.5 top-3.5" />
-              <Input
+              <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+              <input
                 type="email"
-                placeholder="alexandra@example.com"
+                placeholder="alexandra@concierge.luxury"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-10 rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+                className="glass-input w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
                 required
               />
             </div>
@@ -166,61 +171,65 @@ export default function SignupPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="editorial-tag text-[9px] text-[#78848C]">Password *</Label>
+              <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
+                Password *
+              </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#78848C] absolute left-3.5 top-3.5" />
-                <Input
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
                   type="password"
                   placeholder="Min 8 chars"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+                  className="glass-input w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-1">
-              <Label className="editorial-tag text-[9px] text-[#78848C]">Confirm *</Label>
+              <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
+                Confirm *
+              </label>
               <div className="relative">
-                <Lock className="w-4 h-4 text-[#78848C] absolute left-3.5 top-3.5" />
-                <Input
+                <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
+                <input
                   type="password"
-                  placeholder="Confirm password"
+                  placeholder="Repeat passkey"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10 rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+                  className="glass-input w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
                   required
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex items-start space-x-2 pt-1">
+          <div className="flex items-start space-x-2 pt-1 pl-1">
             <Checkbox
               id="terms"
               checked={termsAgreed}
               onCheckedChange={(checked) => setTermsAgreed(!!checked)}
-              className="mt-0.5"
+              className="mt-0.5 border-white/20 data-[state=checked]:bg-[#38bdf8] data-[state=checked]:border-[#38bdf8]"
             />
             <Label
               htmlFor="terms"
-              className="text-[11px] text-[#78848C] leading-snug cursor-pointer font-normal"
+              className="text-[11px] text-slate-400 leading-snug cursor-pointer font-light"
             >
               I agree to the{" "}
-              <span className="text-[#6D9D94] hover:underline">Terms of Service</span> and{" "}
-              <span className="text-[#6D9D94] hover:underline">Privacy Charter</span>.
+              <span className="text-[#38bdf8] hover:underline">Terms of Service</span> and{" "}
+              <span className="text-[#38bdf8] hover:underline">Privacy Charter</span>.
             </Label>
           </div>
 
-          <Button
+          <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-full h-12 bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] font-semibold text-xs shadow-md mt-2"
+            className="btn-luxe w-full py-3.5 rounded-full font-semibold text-xs mt-3 flex items-center justify-center gap-2"
           >
             {loading ? (
               <div className="flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-[#6D9D94] dark:text-[#101E2B]" />
+                <Loader2 className="w-4 h-4 animate-spin text-[#050a10]" />
                 <span>Creating Membership...</span>
               </div>
             ) : (
@@ -229,13 +238,13 @@ export default function SignupPage() {
                 <ArrowRight className="w-4 h-4" />
               </div>
             )}
-          </Button>
+          </button>
         </form>
       )}
 
-      <div className="pt-4 border-t border-black/[0.06] dark:border-white/[0.06] text-center text-xs text-[#78848C]">
+      <div className="pt-4 border-t border-white/10 text-center text-xs text-slate-400 relative z-10">
         Already have a membership?{" "}
-        <Link href="/login" className="text-[#6D9D94] font-semibold hover:underline">
+        <Link href="/login" className="text-[#38bdf8] font-semibold hover:text-[#e8d5b5] transition-colors">
           Sign in
         </Link>
       </div>

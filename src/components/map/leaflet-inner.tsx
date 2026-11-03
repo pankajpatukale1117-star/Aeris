@@ -6,15 +6,15 @@ import "leaflet/dist/leaflet.css"
 import L from "leaflet"
 import { MapPoint } from "./trip-map"
 
-// Custom SVG-based Pin Icon to avoid missing asset png problems in bundlers
+// Custom SVG-based Pin Icon matching ROVEO's Liquid Glass cyan & champagne palette
 const customIcon = L.divIcon({
   className: "custom-leaflet-marker",
-  html: `<div style="background-color: #64B5A7; width: 24px; height: 24px; border-radius: 50%; border: 3px solid white; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center;">
-    <div style="background-color: #172B3A; width: 6px; height: 6px; border-radius: 50%;"></div>
+  html: `<div style="background: #38bdf8; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #050a10; box-shadow: 0 0 16px rgba(56, 189, 248, 0.8); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
+    <div style="background: #e8d5b5; width: 7px; height: 7px; border-radius: 50%;"></div>
   </div>`,
-  iconSize: [24, 24],
-  iconAnchor: [12, 12],
-  popupAnchor: [0, -12],
+  iconSize: [26, 26],
+  iconAnchor: [13, 13],
+  popupAnchor: [0, -14],
 })
 
 interface LeafletInnerProps {
@@ -31,11 +31,11 @@ export function LeafletInner({ points, center, zoom }: LeafletInnerProps) {
       center={mapCenter}
       zoom={zoom}
       scrollWheelZoom={false}
-      style={{ height: "100%", width: "100%", zIndex: 1 }}
+      style={{ height: "100%", width: "100%", zIndex: 1, backgroundColor: "#050a10" }}
     >
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> & CartoDB'
+        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
       />
       {points.map((point) => (
         <Marker
@@ -44,10 +44,10 @@ export function LeafletInner({ points, center, zoom }: LeafletInnerProps) {
           icon={customIcon}
         >
           <Popup>
-            <div className="p-1 text-xs font-sans">
+            <div className="p-1 text-xs font-sans text-slate-900">
               <strong className="block text-sm font-semibold">{point.title}</strong>
               {point.category && (
-                <span className="text-[#64B5A7] font-medium uppercase text-[10px] block mt-0.5">
+                <span className="text-[#0284c7] font-semibold uppercase text-[10px] block mt-0.5 tracking-wider">
                   {point.category}
                 </span>
               )}
@@ -58,4 +58,3 @@ export function LeafletInner({ points, center, zoom }: LeafletInnerProps) {
     </MapContainer>
   )
 }
-

@@ -20,10 +20,6 @@ import {
   CheckCircle2,
   AlertCircle,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import {
   Dialog,
   DialogContent,
@@ -87,8 +83,8 @@ export default function TripDetailPage() {
   if (!mounted) {
     return (
       <div className="py-24 text-center space-y-4 max-w-md mx-auto">
-        <div className="w-8 h-8 border-2 border-[#6D9D94] border-t-transparent rounded-full animate-spin mx-auto" />
-        <p className="text-xs text-[#78848C]">Opening journey blueprint...</p>
+        <div className="w-8 h-8 border-2 border-[#e8d5b5] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-xs text-[#94a3b8]">Opening journey blueprint...</p>
       </div>
     )
   }
@@ -96,15 +92,15 @@ export default function TripDetailPage() {
   if (!trip) {
     return (
       <div className="py-24 text-center space-y-4 max-w-md mx-auto">
-        <AlertCircle className="w-12 h-12 text-[#78848C] mx-auto stroke-1" />
-        <h2 className="font-display text-2xl font-bold">Journey Not Found</h2>
-        <p className="text-xs text-[#78848C]">
+        <AlertCircle className="w-12 h-12 text-[#94a3b8] mx-auto stroke-1" />
+        <h2 className="font-editorial text-3xl font-bold text-white">Journey Not Found</h2>
+        <p className="text-xs text-[#94a3b8]">
           The itinerary you are attempting to view may have been removed or has an incorrect ID.
         </p>
         <Link href="/trips">
-          <Button variant="outline" className="rounded-full text-xs">
+          <button className="glass-pill px-6 py-2.5 rounded-full text-xs text-white hover:text-[#e8d5b5]">
             Return to Journeys
-          </Button>
+          </button>
         </Link>
       </div>
     )
@@ -229,76 +225,72 @@ export default function TripDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <Link
           href="/trips"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#78848C] hover:text-[#18232D] dark:hover:text-[#F8F7F4] transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-[#94a3b8] hover:text-white transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           <span>Back to Journeys</span>
         </Link>
 
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleShare}
-            className="rounded-full text-xs gap-1.5 border-black/10 dark:border-white/10"
+            className="glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5 cursor-pointer"
           >
-            <Share2 className="w-3.5 h-3.5" />
+            <Share2 className="w-3.5 h-3.5 text-[#38bdf8]" />
             <span>Share Itinerary</span>
-          </Button>
+          </button>
 
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={handleDeleteTrip}
-            className="rounded-full text-xs gap-1.5 text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 border-red-200 dark:border-red-900/30"
+            className="glass-pill px-4 py-2 rounded-full text-xs font-semibold text-red-400 hover:text-red-300 flex items-center gap-1.5 cursor-pointer border-red-500/20"
           >
             <Trash2 className="w-3.5 h-3.5" />
             <span>Delete</span>
-          </Button>
+          </button>
         </div>
       </div>
 
-      {/* ─── 2. Cinematic Showcase Banner ─────────────────────────────────── */}
-      <div className="relative aspect-[16/8] md:aspect-[21/8] w-full rounded-3xl overflow-hidden shadow-2xl bg-[#101E2B]">
+      {/* ─── 2. Cinematic Showcase Banner (Rule 2: Strictly Bounded Image Container) ─── */}
+      <div className="relative h-72 sm:h-96 md:h-[420px] w-full rounded-3xl overflow-hidden shadow-2xl glass-shell border border-white/15">
         <Image
           src={trip.coverImage || "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1600&q=80"}
           alt={trip.title}
           fill
           priority
           sizes="100vw"
-          className="object-cover object-center"
+          className="w-full h-full object-cover object-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101E2B] via-[#101E2B]/50 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050a10] via-[#050a10]/50 to-transparent" />
 
-        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="absolute bottom-6 sm:bottom-10 left-6 sm:left-10 right-6 sm:right-10 text-white flex flex-col md:flex-row md:items-end justify-between gap-6 z-10">
           <div className="space-y-2 max-w-2xl">
             <div className="flex items-center gap-2.5">
-              <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#A5C7BA]">
+              <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#e8d5b5]">
                 {trip.planningMode}
               </span>
               <span className="text-xs text-white/60">•</span>
-              <span className="glass-pill px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-white/90 capitalize">
+              <span className="glass-pill px-2.5 py-0.5 rounded-full text-[10px] font-semibold text-[#38bdf8] capitalize">
                 {trip.status}
               </span>
             </div>
 
-            <h1 className="font-display text-3xl sm:text-5xl font-bold tracking-tight">
+            <h1 className="font-editorial text-4xl sm:text-6xl font-bold tracking-tight">
               {trip.title}
             </h1>
 
-            <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#A5C7BA]">
+            <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-[#e8d5b5]">
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" />
+                <MapPin className="w-4 h-4 text-[#38bdf8]" />
                 <span>{trip.destination}</span>
               </span>
               <span>•</span>
-              <span className="flex items-center gap-1.5 text-white/80">
-                <Calendar className="w-4 h-4 text-[#A5C7BA]" />
+              <span className="flex items-center gap-1.5 text-white/90">
+                <Calendar className="w-4 h-4 text-[#38bdf8]" />
                 <span>{trip.dates}</span>
               </span>
               <span>•</span>
-              <span className="flex items-center gap-1.5 text-white/80">
-                <Users className="w-4 h-4 text-[#A5C7BA]" />
+              <span className="flex items-center gap-1.5 text-white/90">
+                <Users className="w-4 h-4 text-[#38bdf8]" />
                 <span>{trip.travelers} traveler{trip.travelers > 1 ? "s" : ""}</span>
               </span>
             </div>
@@ -306,11 +298,11 @@ export default function TripDetailPage() {
 
           {/* Right Summary Badge */}
           {trip.budget && (
-            <div className="glass-pill px-5 py-3 rounded-2xl flex flex-col items-end shrink-0 text-right">
-              <span className="text-[10px] uppercase tracking-wider text-[#A5C7BA] font-semibold">
+            <div className="glass-pill px-5 py-3 rounded-2xl flex flex-col items-end shrink-0 text-right border-white/20">
+              <span className="text-[10px] uppercase tracking-wider text-[#e8d5b5] font-semibold">
                 Estimated Budget
               </span>
-              <span className="font-display text-2xl font-bold text-white">
+              <span className="font-editorial text-3xl font-bold text-white">
                 {trip.budget}
               </span>
             </div>
@@ -324,21 +316,19 @@ export default function TripDetailPage() {
         <div className="lg:col-span-8 space-y-8">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <span className="editorial-tag text-[#6D9D94]">Master Timeline</span>
-              <h2 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+              <span className="editorial-tag text-[#e8d5b5]">Master Timeline</span>
+              <h2 className="font-editorial text-3xl font-bold text-white">
                 Itinerary Schedule
               </h2>
             </div>
 
-            <Button
-              size="sm"
-              variant="outline"
+            <button
               onClick={handleAddDay}
-              className="rounded-full text-xs gap-1.5 border-black/10 dark:border-white/10"
+              className="glass-pill px-4 py-2 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 text-[#6D9D94]" />
+              <Plus className="w-3.5 h-3.5 text-[#38bdf8]" />
               <span>Add Day</span>
-            </Button>
+            </button>
           </div>
 
           <ItineraryTimeline
@@ -354,10 +344,10 @@ export default function TripDetailPage() {
         {/* Right Column (4 cols): Interactive Map & Concierge Desk ─────── */}
         <div className="lg:col-span-4 space-y-6">
           {/* Topographic Map */}
-          <div className="glass-dock p-5 rounded-3xl border shadow-sm space-y-3">
+          <div className="glass-dock p-5 rounded-3xl border border-white/15 shadow-2xl space-y-3">
             <div className="flex items-center justify-between">
-              <span className="editorial-tag text-[#6D9D94]">Interactive Route</span>
-              <span className="text-[11px] text-[#78848C]">
+              <span className="editorial-tag text-[#38bdf8]">Interactive Route</span>
+              <span className="text-[11px] text-[#94a3b8]">
                 {mapPoints.length} point{mapPoints.length > 1 ? "s" : ""} plotted
               </span>
             </div>
@@ -366,25 +356,25 @@ export default function TripDetailPage() {
               points={mapPoints}
               center={defaultCenter}
               zoom={12}
-              className="h-[280px] w-full rounded-2xl overflow-hidden border border-black/[0.08] dark:border-white/[0.08]"
+              className="h-[280px] w-full rounded-2xl overflow-hidden border border-white/10"
             />
           </div>
 
           {/* Concierge Notes & Reservations */}
-          <div className="glass-dock p-6 rounded-3xl border shadow-sm space-y-4">
+          <div className="glass-dock p-6 rounded-3xl border border-white/15 shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
-              <span className="editorial-tag text-[#6D9D94]">Concierge Notes</span>
+              <span className="editorial-tag text-[#e8d5b5]">Concierge Notes</span>
               {!isEditingNotes ? (
                 <button
                   onClick={() => setIsEditingNotes(true)}
-                  className="text-xs font-semibold text-[#6D9D94] hover:underline"
+                  className="text-xs font-semibold text-[#38bdf8] hover:underline"
                 >
                   Edit
                 </button>
               ) : (
                 <button
                   onClick={handleSaveNotes}
-                  className="text-xs font-semibold text-[#6D9D94] hover:underline"
+                  className="text-xs font-semibold text-[#e8d5b5] hover:underline"
                 >
                   Save
                 </button>
@@ -392,36 +382,33 @@ export default function TripDetailPage() {
             </div>
 
             {!isEditingNotes ? (
-              <p className="text-xs sm:text-sm text-[#78848C] leading-relaxed whitespace-pre-line">
+              <p className="text-xs sm:text-sm text-[#94a3b8] leading-relaxed whitespace-pre-line">
                 {trip.notes || "No personal notes entered yet. Click 'Edit' to record reservation codes, tickets, or packing instructions."}
               </p>
             ) : (
-              <div className="space-y-2">
-                <Textarea
+              <div className="space-y-3">
+                <textarea
                   value={notesDraft}
                   onChange={(e) => setNotesDraft(e.target.value)}
                   placeholder="Record confirmation numbers, ferry bookings, restaurant reservations..."
-                  className="text-xs min-h-[100px] rounded-2xl bg-black/[0.02] dark:bg-white/[0.04]"
+                  className="text-xs min-h-[100px] w-full rounded-2xl glass-input p-3"
                 />
                 <div className="flex justify-end gap-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
+                  <button
                     onClick={() => {
                       setNotesDraft(trip.notes || "")
                       setIsEditingNotes(false)
                     }}
-                    className="text-xs rounded-full h-8"
+                    className="glass-pill px-4 py-1.5 text-xs text-white"
                   >
                     Cancel
-                  </Button>
-                  <Button
-                    size="sm"
+                  </button>
+                  <button
                     onClick={handleSaveNotes}
-                    className="text-xs rounded-full h-8 bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B]"
+                    className="btn-luxe px-4 py-1.5 text-xs font-semibold"
                   >
                     Save Notes
-                  </Button>
+                  </button>
                 </div>
               </div>
             )}
@@ -431,116 +418,115 @@ export default function TripDetailPage() {
 
       {/* ─── 4. Add Activity Modal Dialog ─────────────────────────────────── */}
       <Dialog open={isAddActivityOpen} onOpenChange={setIsAddActivityOpen}>
-        <DialogContent className="sm:max-w-[480px] rounded-3xl p-6 sm:p-8">
+        <DialogContent className="sm:max-w-[480px] rounded-3xl p-6 sm:p-8 glass-dock border border-white/20 shadow-2xl text-white">
           <DialogHeader className="space-y-1">
-            <span className="editorial-tag text-[#6D9D94]">Day {targetDayNumber}</span>
-            <DialogTitle className="font-display text-2xl font-bold">
+            <span className="editorial-tag text-[#e8d5b5]">Day {targetDayNumber}</span>
+            <DialogTitle className="font-editorial text-3xl font-bold text-white">
               Add New Experience
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#78848C]">
+            <DialogDescription className="text-xs text-[#94a3b8]">
               Schedule a visit, restaurant, reservation, or scenic detour.
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSaveNewActivity} className="space-y-4 pt-2">
             <div className="space-y-1.5">
-              <Label className="editorial-tag text-[9px] text-[#78848C]">Title *</Label>
-              <Input
+              <label className="editorial-tag text-[9px] text-[#e8d5b5]">Title *</label>
+              <input
                 value={actTitle}
                 onChange={(e) => setActTitle(e.target.value)}
                 placeholder="e.g. Bamboo Grove Sunrise Walk"
-                className="rounded-2xl text-xs h-10"
+                className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 required
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="editorial-tag text-[9px] text-[#78848C]">Time</Label>
-                <Input
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Time</label>
+                <input
                   type="time"
                   value={actTime}
                   onChange={(e) => setActTime(e.target.value)}
-                  className="rounded-2xl text-xs h-10"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="editorial-tag text-[9px] text-[#78848C]">Duration</Label>
-                <Input
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Duration</label>
+                <input
                   value={actDuration}
                   onChange={(e) => setActDuration(e.target.value)}
                   placeholder="e.g. 2h"
-                  className="rounded-2xl text-xs h-10"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label className="editorial-tag text-[9px] text-[#78848C]">Location</Label>
-                <Input
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Location</label>
+                <input
                   value={actLocation}
                   onChange={(e) => setActLocation(e.target.value)}
                   placeholder="e.g. Arashiyama District"
-                  className="rounded-2xl text-xs h-10"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 />
               </div>
 
               <div className="space-y-1.5">
-                <Label className="editorial-tag text-[9px] text-[#78848C]">Estimated Cost ($)</Label>
-                <Input
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Estimated Cost ($)</label>
+                <input
                   type="number"
                   value={actCost}
                   onChange={(e) => setActCost(e.target.value)}
                   placeholder="0 for Free"
-                  className="rounded-2xl text-xs h-10"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 />
               </div>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="editorial-tag text-[9px] text-[#78848C]">Category</Label>
+              <label className="editorial-tag text-[9px] text-[#e8d5b5]">Category</label>
               <select
                 value={actCategory}
                 onChange={(e) => setActCategory(e.target.value)}
-                className="w-full h-10 px-3 rounded-2xl border border-input bg-background text-xs"
+                className="w-full h-10 px-3.5 rounded-2xl glass-input text-xs cursor-pointer"
               >
-                <option value="Sightseeing">Sightseeing</option>
-                <option value="Dining">Dining / Food</option>
-                <option value="Culture">Culture & History</option>
-                <option value="Adventure">Adventure & Outdoor</option>
-                <option value="Stay">Accommodation / Stay</option>
-                <option value="Transit">Transportation</option>
-                <option value="Relaxation">Relaxation</option>
+                <option value="Sightseeing" className="bg-[#050a10]">Sightseeing</option>
+                <option value="Dining" className="bg-[#050a10]">Dining / Food</option>
+                <option value="Culture" className="bg-[#050a10]">Culture & History</option>
+                <option value="Adventure" className="bg-[#050a10]">Adventure & Outdoor</option>
+                <option value="Stay" className="bg-[#050a10]">Accommodation / Stay</option>
+                <option value="Transit" className="bg-[#050a10]">Transportation</option>
+                <option value="Relaxation" className="bg-[#050a10]">Relaxation</option>
               </select>
             </div>
 
             <div className="space-y-1.5">
-              <Label className="editorial-tag text-[9px] text-[#78848C]">Description / Concierge Details</Label>
-              <Textarea
+              <label className="editorial-tag text-[9px] text-[#e8d5b5]">Description / Concierge Details</label>
+              <textarea
                 value={actDesc}
                 onChange={(e) => setActDesc(e.target.value)}
                 placeholder="Details regarding reservations, best vantage points, or tickets..."
-                className="rounded-2xl text-xs min-h-[70px]"
+                className="w-full glass-input rounded-2xl text-xs min-h-[70px] p-3"
               />
             </div>
 
             <DialogFooter className="pt-2">
-              <Button
+              <button
                 type="button"
-                variant="outline"
                 onClick={() => setIsAddActivityOpen(false)}
-                className="rounded-full text-xs"
+                className="glass-pill px-5 py-2 rounded-full text-xs text-white"
               >
                 Cancel
-              </Button>
-              <Button
+              </button>
+              <button
                 type="submit"
-                className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] text-xs font-semibold px-5"
+                className="btn-luxe px-6 py-2 rounded-full text-xs font-semibold"
               >
                 Save Experience
-              </Button>
+              </button>
             </DialogFooter>
           </form>
         </DialogContent>

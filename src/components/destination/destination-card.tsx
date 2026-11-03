@@ -47,34 +47,35 @@ export function DestinationCard({
     })
   }
 
-  const aspectClass =
+  // Strict height containment per Anti-Breakage Rule 2
+  const heightClass =
     variant === "spotlight"
-      ? "aspect-[16/11] sm:aspect-[16/10]"
+      ? "h-72 sm:h-80"
       : variant === "landscape"
-      ? "aspect-[16/10]"
-      : "aspect-[4/5]"
+      ? "h-60 sm:h-64"
+      : "h-56 sm:h-64"
 
   return (
     <Link
       href={`/destinations/${destination.id}`}
-      className="group relative block rounded-3xl overflow-hidden bg-[#101E2B] transition-all duration-700 hover:shadow-2xl hover:shadow-[#101E2B]/15"
+      className="group relative block rounded-3xl overflow-hidden glass-card transition-all duration-500 hover:shadow-2xl"
     >
-      {/* Editorial Image Canvas */}
-      <div className={`relative ${aspectClass} w-full overflow-hidden`}>
+      {/* Strict Image Containment Container (Rule 2) */}
+      <div className={`relative ${heightClass} w-full overflow-hidden`}>
         <Image
           src={destination.image}
           alt={destination.name}
           fill
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
-          className="object-cover object-center transition-transform duration-1000 ease-out group-hover:scale-105"
+          className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
         />
 
-        {/* Editorial Film Vignette & Multi-step Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#101E2B] via-[#101E2B]/30 to-black/10 transition-opacity duration-500 group-hover:opacity-90" />
+        {/* Liquid Glass Overlay Vignette */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[#050a10] via-[#050a10]/40 to-transparent transition-opacity duration-500 group-hover:opacity-90" />
 
-        {/* Top Controls: Category tag & Minimalist Bookmark */}
+        {/* Top Controls: Glass Pill Category + Bookmark */}
         <div className="absolute top-4 left-4 right-4 flex items-center justify-between z-10">
-          <span className="glass-pill text-[10px] uppercase tracking-[0.2em] font-semibold px-3 py-1 rounded-full text-white drop-shadow-sm">
+          <span className="glass-pill text-[10px] uppercase tracking-[0.2em] font-semibold px-3 py-1 rounded-full text-white/90 drop-shadow-sm">
             {destination.category}
           </span>
 
@@ -85,41 +86,41 @@ export function DestinationCard({
           >
             <Bookmark
               className={`w-4 h-4 transition-colors ${
-                isSaved ? "fill-[#A5C7BA] text-[#A5C7BA]" : "text-white"
+                isSaved ? "fill-[#e8d5b5] text-[#e8d5b5]" : "text-white"
               }`}
             />
           </button>
         </div>
 
-        {/* Bottom Editorial Information Block */}
-        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 text-[#F8F7F4] z-10 space-y-2">
+        {/* Bottom Information Block */}
+        <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 text-[#f1f5f9] z-10 space-y-2">
           {/* Location Subtitle */}
-          <div className="flex items-center gap-1.5 text-xs text-[#A5C7BA] font-medium tracking-wide">
+          <div className="flex items-center gap-1.5 text-xs text-[#e8d5b5] font-medium tracking-wide">
             <MapPin className="w-3.5 h-3.5" />
             <span>{destination.location}, {destination.country}</span>
           </div>
 
-          {/* Heading */}
+          {/* Editorial Heading */}
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="font-display text-2xl sm:text-2xl font-bold tracking-tight text-white group-hover:text-[#A5C7BA] transition-colors duration-300">
+            <h3 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#e8d5b5] transition-colors duration-300">
               {destination.name}
             </h3>
 
-            <div className="flex items-center gap-1 text-xs text-amber-300/90 font-medium shrink-0">
+            <div className="flex items-center gap-1 text-xs text-[#e8d5b5] font-semibold shrink-0">
               <Star className="w-3.5 h-3.5 fill-current" />
               <span>{destination.rating}</span>
             </div>
           </div>
 
-          {/* Highlights summary */}
-          <p className="text-xs text-[#F8F7F4]/75 line-clamp-2 leading-relaxed">
+          {/* Description Snippet */}
+          <p className="text-xs text-[#94a3b8] line-clamp-2 leading-relaxed">
             {destination.description}
           </p>
 
-          {/* Bottom Bar: Duration & Budget */}
-          <div className="pt-3 border-t border-white/[0.1] flex items-center justify-between text-[11px] text-[#A5C7BA] font-medium">
-            <span>{destination.recommendedDuration}</span>
-            <span className="text-white/90 font-semibold">{destination.approximateBudget}</span>
+          {/* Bottom Telemetry Bar: Duration & Budget */}
+          <div className="pt-3 border-t border-white/[0.1] flex items-center justify-between text-[11px] text-[#94a3b8] font-medium">
+            <span className="text-[#38bdf8]">{destination.recommendedDuration}</span>
+            <span className="text-white font-semibold">{destination.approximateBudget}</span>
           </div>
         </div>
       </div>

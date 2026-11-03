@@ -17,7 +17,6 @@ import {
   ArrowUpRight,
   Plane,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { DESTINATIONS } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
 import { useTravelStore } from "@/lib/store/travel-store"
@@ -31,11 +30,6 @@ export default function DashboardPage() {
   React.useEffect(() => {
     setMounted(true)
   }, [])
-
-  const upcomingTrips = React.useMemo(() => {
-    if (!mounted) return []
-    return trips.filter((t) => t.status === "upcoming" || t.status === "planning")
-  }, [mounted, trips])
 
   const activeJourney = React.useMemo(() => {
     if (!mounted || trips.length === 0) return null
@@ -54,30 +48,30 @@ export default function DashboardPage() {
   return (
     <div className="space-y-12 animate-in fade-in duration-500 max-w-6xl mx-auto">
       {/* ─── 1. Editorial Welcome & Traveler Status ────────────────────────── */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-black/[0.08] dark:border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-white/[0.08]">
         <div className="flex items-center gap-4 sm:gap-5">
-          <div className="relative w-16 h-16 rounded-full overflow-hidden border border-black/10 dark:border-white/20 shrink-0 shadow-sm bg-[#101E2B]/10 dark:bg-white/10 flex items-center justify-center">
+          <div className="relative w-16 h-16 rounded-full overflow-hidden border border-[#e8d5b5]/40 shrink-0 shadow-lg bg-[#050a10] flex items-center justify-center">
             {user.avatarUrl ? (
               <Image
                 src={user.avatarUrl}
                 alt={user.fullName || "User"}
                 fill
-                className="object-cover"
+                className="w-full h-full object-cover"
               />
             ) : (
-              <span className="font-display font-bold text-xl text-[#101E2B] dark:text-[#F8F7F4]">
+              <span className="font-editorial font-bold text-2xl text-[#e8d5b5]">
                 {user.fullName ? user.fullName.charAt(0).toUpperCase() : "R"}
               </span>
             )}
           </div>
           <div className="space-y-0.5">
-            <span className="editorial-tag text-[#6D9D94]">
-              {user.tier || "Passport Member"} • Active Travel Desk
+            <span className="editorial-tag text-[#38bdf8]">
+              {user.tier || "Passport Concierge"} • Active Travel Desk
             </span>
-            <h1 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#18232D] dark:text-[#F8F7F4]">
+            <h1 className="font-editorial text-3xl sm:text-5xl font-bold tracking-tight text-[#f1f5f9]">
               Welcome back, {user.fullName ? user.fullName.split(" ")[0] : "Traveler"}
             </h1>
-            <p className="text-xs sm:text-sm text-[#78848C]">
+            <p className="text-xs sm:text-sm text-[#94a3b8]">
               Your journey. Your rules. Your world.
             </p>
           </div>
@@ -86,20 +80,17 @@ export default function DashboardPage() {
         {/* Dual Planning Shortcuts */}
         <div className="flex items-center gap-3">
           <Link href="/ai-planner">
-            <Button className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] text-white dark:text-[#101E2B] text-xs font-semibold px-5 py-5 shadow-sm">
-              <Sparkles className="w-3.5 h-3.5 mr-2 text-[#6D9D94] dark:text-[#101E2B]" />
-              <span>AI Trip Studio</span>
-            </Button>
+            <button className="btn-luxe px-5 py-3 text-xs font-semibold gap-2 shadow-lg cursor-pointer">
+              <Sparkles className="w-3.5 h-3.5 text-[#050a10]" />
+              <span>AI Concierge</span>
+            </button>
           </Link>
 
           <Link href="/manual-planner">
-            <Button
-              variant="outline"
-              className="rounded-full border-black/15 dark:border-white/20 text-xs font-semibold px-5 py-5 hover:bg-black/5 dark:hover:bg-white/5"
-            >
-              <PlusCircle className="w-3.5 h-3.5 mr-2 text-[#78848C]" />
-              <span>Manual Builder</span>
-            </Button>
+            <button className="glass-pill px-5 py-3 text-xs font-semibold text-[#f1f5f9] hover:text-[#e8d5b5] rounded-full gap-2 flex items-center cursor-pointer">
+              <PlusCircle className="w-3.5 h-3.5 text-[#e8d5b5]" />
+              <span>Manual Studio</span>
+            </button>
           </Link>
         </div>
       </div>
@@ -107,49 +98,49 @@ export default function DashboardPage() {
       {/* ─── 2. Spotlight: Active Upcoming Journey ─────────────────────────── */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <span className="editorial-tag">Next Departure</span>
+          <span className="editorial-tag text-[#e8d5b5]">Next Departure</span>
           <Link
             href="/trips"
-            className="text-xs font-semibold text-[#6D9D94] hover:text-[#101E2B] dark:hover:text-[#F8F7F4] transition-colors"
+            className="text-xs font-semibold text-[#38bdf8] hover:text-white transition-colors"
           >
             All Saved Journeys ({mounted ? trips.length : "..."}) →
           </Link>
         </div>
 
         {activeJourney ? (
-          /* Cinematic Journey Spotlight Card */
+          /* Cinematic Journey Spotlight Card (Rule 2: Image strictly bounded) */
           <Link
             href={`/trips/${activeJourney.id}`}
-            className="group block relative rounded-3xl overflow-hidden bg-[#101E2B] text-white shadow-xl transition-all duration-500 hover:shadow-2xl"
+            className="group block relative rounded-3xl overflow-hidden glass-card shadow-2xl transition-all duration-500 hover:shadow-2xl border border-white/15"
           >
             <div className="grid grid-cols-1 md:grid-cols-12 items-stretch">
               {/* Image Canvas */}
-              <div className="md:col-span-5 relative aspect-[16/10] md:aspect-auto w-full min-h-[260px] overflow-hidden">
+              <div className="md:col-span-5 relative h-64 md:h-auto min-h-[260px] w-full overflow-hidden">
                 <Image
                   src={activeJourney.coverImage || "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&q=80"}
                   alt={activeJourney.title}
                   fill
-                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                  className="w-full h-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#101E2B] via-transparent to-transparent opacity-80" />
+                <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#050a10] via-transparent to-transparent opacity-80" />
               </div>
 
               {/* Details Panel */}
               <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#A5C7BA]">
+                    <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#e8d5b5]">
                       {activeJourney.status}
                     </span>
                     <span className="text-xs text-white/50">•</span>
-                    <span className="text-xs text-white/70 font-medium">{activeJourney.planningMode}</span>
+                    <span className="text-xs text-[#38bdf8] font-medium">{activeJourney.planningMode}</span>
                   </div>
 
-                  <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#A5C7BA] transition-colors">
+                  <h3 className="font-editorial text-2xl sm:text-4xl font-bold tracking-tight text-white group-hover:text-[#e8d5b5] transition-colors">
                     {activeJourney.title}
                   </h3>
 
-                  <p className="text-xs sm:text-sm text-white/70 leading-relaxed font-normal">
+                  <p className="text-xs sm:text-sm text-[#94a3b8] leading-relaxed font-normal">
                     {activeJourney.notes || `Curated itinerary covering ${activeJourney.destination} across ${activeJourney.days?.length || activeJourney.daysCount} planned days.`}
                   </p>
                 </div>
@@ -157,13 +148,13 @@ export default function DashboardPage() {
                 {/* Progress & Metadata */}
                 <div className="pt-4 border-t border-white/[0.1] space-y-2">
                   <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80">
-                    <span className="flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#A5C7BA]" />
+                    <span className="flex items-center gap-1.5 text-[#e8d5b5]">
+                      <Calendar className="w-3.5 h-3.5 text-[#38bdf8]" />
                       {activeJourney.dates}
                     </span>
-                    <span className="font-semibold text-[#A5C7BA] flex items-center gap-1">
+                    <span className="font-semibold text-[#e8d5b5] flex items-center gap-1">
                       <span>View Master Blueprint</span>
-                      <ArrowUpRight className="w-3.5 h-3.5" />
+                      <ArrowUpRight className="w-3.5 h-3.5 text-[#38bdf8]" />
                     </span>
                   </div>
                 </div>
@@ -171,24 +162,24 @@ export default function DashboardPage() {
             </div>
           </Link>
         ) : (
-          <div className="p-8 sm:p-12 glass-dock rounded-3xl border border-black/[0.08] dark:border-white/[0.08] text-center space-y-4 max-w-lg mx-auto">
-            <Plane className="w-10 h-10 text-[#6D9D94] mx-auto stroke-1" />
-            <h3 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+          <div className="p-8 sm:p-12 glass-dock rounded-3xl border border-white/15 text-center space-y-4 max-w-lg mx-auto">
+            <Plane className="w-10 h-10 text-[#38bdf8] mx-auto stroke-1" />
+            <h3 className="font-editorial text-3xl font-bold text-white">
               Ready for your next journey?
             </h3>
-            <p className="text-xs text-[#78848C]">
+            <p className="text-xs text-[#94a3b8]">
               Your travel desk is currently clear. Use our AI Travel Studio to synthesize a full multi-day itinerary in seconds, or craft one by hand.
             </p>
             <div className="pt-2 flex items-center justify-center gap-3">
               <Link href="/ai-planner">
-                <Button className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] text-xs px-5">
+                <button className="btn-luxe px-6 py-2.5 text-xs font-semibold cursor-pointer">
                   Launch AI Studio
-                </Button>
+                </button>
               </Link>
               <Link href="/manual-planner">
-                <Button variant="outline" className="rounded-full text-xs px-5">
+                <button className="glass-pill px-6 py-2.5 text-xs text-white hover:text-[#e8d5b5] rounded-full cursor-pointer">
                   Manual Builder
-                </Button>
+                </button>
               </Link>
             </div>
           </div>
@@ -199,14 +190,14 @@ export default function DashboardPage() {
       <div className="space-y-6 pt-4">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
-            <span className="editorial-tag">Wishlist</span>
-            <h2 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
-              Saved Destinations
+            <span className="editorial-tag text-[#38bdf8]">Wishlist</span>
+            <h2 className="font-editorial text-2xl sm:text-4xl font-bold tracking-tight text-[#f1f5f9]">
+              Saved Sanctuaries
             </h2>
           </div>
           <Link
             href="/saved"
-            className="text-xs font-semibold text-[#6D9D94] hover:text-[#101E2B] dark:hover:text-[#F8F7F4] transition-colors"
+            className="text-xs font-semibold text-[#e8d5b5] hover:text-white transition-colors"
           >
             View All Saved ({mounted ? savedDestinationIds.length : "..."}) →
           </Link>
@@ -224,16 +215,16 @@ export default function DashboardPage() {
             ))}
           </div>
         ) : (
-          <div className="p-8 glass-dock rounded-3xl border border-black/[0.08] dark:border-white/[0.08] text-center space-y-3">
-            <Bookmark className="w-8 h-8 text-[#78848C] mx-auto stroke-1" />
-            <h4 className="font-display font-bold text-base">No destinations saved yet</h4>
-            <p className="text-xs text-[#78848C] max-w-sm mx-auto">
-              Explore the global atlas and save places you would like to incorporate into future trips.
+          <div className="p-8 glass-dock rounded-3xl border border-white/15 text-center space-y-3">
+            <Bookmark className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
+            <h4 className="font-editorial font-bold text-xl text-white">No destinations saved yet</h4>
+            <p className="text-xs text-[#94a3b8] max-w-sm mx-auto">
+              Explore the global atlas and save sanctuaries you would like to incorporate into future trips.
             </p>
             <Link href="/destinations" className="inline-block pt-1">
-              <Button variant="outline" size="sm" className="rounded-full text-xs">
+              <button className="glass-pill px-5 py-2 rounded-full text-xs text-white hover:text-[#e8d5b5]">
                 Explore Atlas
-              </Button>
+              </button>
             </Link>
           </div>
         )}

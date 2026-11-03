@@ -15,10 +15,6 @@ import {
   CheckCircle2,
   FileText,
 } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
 import { ActivityCard, ActivityItem } from "@/components/trip/activity-card"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
@@ -225,62 +221,62 @@ function ManualPlannerContent() {
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-6xl mx-auto">
       {/* Editorial Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-black/[0.08] dark:border-white/[0.08]">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-white/[0.08]">
         <div className="space-y-1">
-          <span className="editorial-tag">Custom Studio</span>
-          <h1 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#18232D] dark:text-[#F8F7F4]">
+          <span className="editorial-tag text-[#e8d5b5]">Custom Studio</span>
+          <h1 className="font-editorial text-3xl sm:text-5xl font-bold tracking-tight text-[#f1f5f9]">
             Manual Trip Builder
           </h1>
-          <p className="text-sm text-[#78848C]">
+          <p className="text-sm text-[#94a3b8]">
             Total autonomy over every hour, reservation, and expenditure.
           </p>
         </div>
 
-        <Button
+        <button
           onClick={handleSaveTrip}
-          className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] text-white dark:text-[#101E2B] font-semibold text-xs sm:text-sm px-6 py-5 shadow-sm gap-2"
+          className="btn-luxe px-6 py-3 text-xs sm:text-sm font-semibold gap-2 shadow-xl cursor-pointer"
         >
-          <Save className="w-4 h-4" />
+          <Save className="w-4 h-4 text-[#050a10]" />
           <span>Save Itinerary</span>
-        </Button>
+        </button>
       </div>
 
       {/* Trip Master Details Form */}
-      <div className="glass-dock p-6 rounded-3xl border shadow-sm space-y-4">
-        <span className="editorial-tag">Trip Parameters</span>
+      <div className="glass-shell p-6 rounded-3xl border border-white/15 shadow-2xl space-y-4">
+        <span className="editorial-tag text-[#e8d5b5]">Trip Parameters</span>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
           <div className="space-y-1.5">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Trip Title</Label>
-            <Input
+            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Trip Title</label>
+            <input
               value={tripTitle}
               onChange={(e) => setTripTitle(e.target.value)}
-              className="rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Destination</Label>
-            <Input
+            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Destination</label>
+            <input
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
-              className="rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Start Date</Label>
-            <Input
+            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Start Date</label>
+            <input
               type="date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
-              className="rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10 cursor-pointer"
+              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm cursor-pointer"
             />
           </div>
           <div className="space-y-1.5">
-            <Label className="editorial-tag text-[9px] text-[#78848C]">Target Budget ($)</Label>
-            <Input
+            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Target Budget ($)</label>
+            <input
               type="number"
               value={budget}
               onChange={(e) => setBudget(e.target.value)}
-              className="rounded-2xl h-10 text-xs sm:text-sm bg-black/[0.02] dark:bg-white/[0.04] border-black/10 dark:border-white/10"
+              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm"
             />
           </div>
         </div>
@@ -291,19 +287,17 @@ function ManualPlannerContent() {
         {/* Left Column: Day Manager */}
         <div className="lg:col-span-4 space-y-4">
           <div className="flex items-center justify-between">
-            <span className="editorial-tag">Days ({days.length})</span>
-            <Button
-              size="sm"
-              variant="outline"
+            <span className="editorial-tag text-[#38bdf8]">Days ({days.length})</span>
+            <button
               onClick={handleAddDay}
-              className="rounded-full text-xs gap-1.5 border-black/10 dark:border-white/10"
+              className="glass-pill px-3 py-1.5 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5 cursor-pointer"
             >
-              <Plus className="w-3.5 h-3.5 text-[#6D9D94]" />
+              <Plus className="w-3.5 h-3.5 text-[#38bdf8]" />
               <span>Add Day</span>
-            </Button>
+            </button>
           </div>
 
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {days.map((day) => {
               const isSelected = day.dayNumber === activeDayNumber
               return (
@@ -312,17 +306,17 @@ function ManualPlannerContent() {
                   onClick={() => setActiveDayNumber(day.dayNumber)}
                   className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
                     isSelected
-                      ? "bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] border-transparent font-semibold shadow-sm"
-                      : "bg-card border-black/[0.06] dark:border-white/[0.06] hover:bg-black/[0.02] text-[#18232D] dark:text-[#F8F7F4]"
+                      ? "glass-pill active border-[#e8d5b5] shadow-[0_0_15px_rgba(232,213,181,0.25)]"
+                      : "glass-card hover:border-white/20"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <span className="w-6 h-6 rounded-full bg-white/20 dark:bg-black/20 flex items-center justify-center font-bold text-xs">
+                    <span className="w-6 h-6 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-[#e8d5b5]">
                       {day.dayNumber}
                     </span>
                     <div>
-                      <p className="text-xs font-semibold leading-tight">{day.title}</p>
-                      <span className="text-[10px] opacity-70 block mt-0.5">
+                      <p className="text-xs font-semibold text-white leading-tight">{day.title}</p>
+                      <span className="text-[10px] text-[#94a3b8] block mt-0.5">
                         {day.activities.length} activit{day.activities.length === 1 ? "y" : "ies"}
                       </span>
                     </div>
@@ -333,149 +327,141 @@ function ManualPlannerContent() {
           </div>
 
           {/* Quick Notes Card */}
-          <div className="glass-dock p-4 rounded-2xl border shadow-sm space-y-2 text-xs">
-            <Label className="editorial-tag text-[9px] text-[#78848C] flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#6D9D94]" />
+          <div className="glass-dock p-4 rounded-2xl border border-white/15 shadow-lg space-y-2 text-xs">
+            <label className="editorial-tag text-[9px] text-[#e8d5b5] flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-[#38bdf8]" />
               Personal Notes
-            </Label>
-            <Textarea
+            </label>
+            <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Packing reminders, tickets, reservations..."
               rows={3}
-              className="text-xs rounded-xl bg-transparent border-black/10 dark:border-white/10"
+              className="w-full glass-input rounded-xl p-3 text-xs"
             />
           </div>
         </div>
 
         {/* Right Columns: Day Activities Timeline */}
         <div className="lg:col-span-8 space-y-6">
-          <div className="glass-dock p-6 sm:p-8 rounded-3xl border shadow-sm space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-black/[0.06] dark:border-white/[0.06]">
+          <div className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/15 shadow-2xl space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
               <div>
-                <span className="editorial-tag text-[#6D9D94]">Day {activeDay.dayNumber} Focus</span>
-                <h3 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+                <span className="editorial-tag text-[#38bdf8]">Day {activeDay.dayNumber} Focus</span>
+                <h3 className="font-editorial text-2xl sm:text-3xl font-bold text-white">
                   {activeDay.title}
                 </h3>
               </div>
 
-              <Button
-                size="sm"
-                onClick={() => setIsAddingActivity(!isAddingActivity)}
-                className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] text-white dark:text-[#101E2B] text-xs gap-1.5 shadow-sm"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>{isAddingActivity ? "Cancel" : "Add Activity"}</span>
-              </Button>
+              {!isAddingActivity && (
+                <button
+                  onClick={() => setIsAddingActivity(true)}
+                  className="btn-luxe px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer shadow-md"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#050a10]" />
+                  <span>Add Experience</span>
+                </button>
+              )}
             </div>
 
             {/* Add Activity Inline Form */}
             {isAddingActivity && (
-              <form
-                onSubmit={handleSaveActivity}
-                className="bg-black/[0.02] dark:bg-white/[0.03] p-5 rounded-2xl border border-black/[0.08] dark:border-white/[0.08] space-y-3.5"
-              >
-                <h4 className="editorial-tag text-[9px] text-[#6D9D94]">
-                  Add Experience to Day {activeDay.dayNumber}
-                </h4>
+              <form onSubmit={handleSaveActivity} className="p-5 rounded-2xl glass-dock border border-white/20 space-y-4">
+                <span className="editorial-tag text-[#e8d5b5]">New Experience Entry</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                  <div className="space-y-1">
+                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Time</label>
+                    <input
+                      type="time"
+                      value={newActTime}
+                      onChange={(e) => setNewActTime(e.target.value)}
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1 sm:col-span-2">
+                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Title *</label>
+                    <input
+                      value={newActTitle}
+                      onChange={(e) => setNewActTitle(e.target.value)}
+                      placeholder="e.g. Positano Boat Charter"
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs"
+                      required
+                    />
+                  </div>
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1">
-                    <Label className="editorial-tag text-[9px] text-[#78848C]">Time (e.g. 09:30 AM)</Label>
-                    <Input
-                      value={newActTime}
-                      onChange={(e) => setNewActTime(e.target.value)}
-                      placeholder="09:30 AM"
-                      className="rounded-xl h-9 text-xs bg-transparent"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="editorial-tag text-[9px] text-[#78848C]">Activity Title *</Label>
-                    <Input
-                      value={newActTitle}
-                      onChange={(e) => setNewActTitle(e.target.value)}
-                      placeholder="e.g. Sentiero degli Dei Trek"
-                      className="rounded-xl h-9 text-xs bg-transparent"
-                      required
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="editorial-tag text-[9px] text-[#78848C]">Location</Label>
-                    <Input
+                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Location</label>
+                    <input
                       value={newActLoc}
                       onChange={(e) => setNewActLoc(e.target.value)}
-                      placeholder="e.g. Bomerano Summit"
-                      className="rounded-xl h-9 text-xs bg-transparent"
+                      placeholder="e.g. Positano Port"
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs"
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="editorial-tag text-[9px] text-[#78848C]">Estimated Cost</Label>
-                    <Input
+                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Est. Cost ($)</label>
+                    <input
+                      type="number"
                       value={newActCost}
                       onChange={(e) => setNewActCost(e.target.value)}
-                      placeholder="e.g. 25 or Free"
-                      className="rounded-xl h-9 text-xs bg-transparent"
+                      placeholder="0 for Free"
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs"
                     />
                   </div>
                 </div>
 
                 <div className="space-y-1">
-                  <Label className="editorial-tag text-[9px] text-[#78848C]">Description & Context</Label>
-                  <Textarea
+                  <label className="editorial-tag text-[8px] text-[#94a3b8]">Description</label>
+                  <textarea
                     value={newActDesc}
                     onChange={(e) => setNewActDesc(e.target.value)}
-                    placeholder="Details, reservation code, or walking notes..."
+                    placeholder="Details, reservation confirmation codes..."
                     rows={2}
-                    className="rounded-xl text-xs bg-transparent"
+                    className="w-full glass-input rounded-xl p-3 text-xs"
                   />
                 </div>
 
                 <div className="flex justify-end gap-2 pt-1">
-                  <Button
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
                     onClick={() => setIsAddingActivity(false)}
-                    className="text-xs"
+                    className="glass-pill px-4 py-1.5 text-xs text-white"
                   >
                     Cancel
-                  </Button>
-                  <Button
+                  </button>
+                  <button
                     type="submit"
-                    size="sm"
-                    className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] text-xs px-5"
+                    className="btn-luxe px-5 py-1.5 text-xs font-semibold"
                   >
-                    Save Experience
-                  </Button>
+                    Save Activity
+                  </button>
                 </div>
               </form>
             )}
 
             {/* Activities List */}
-            <div className="space-y-3 relative pl-6 sm:pl-8 border-l-2 border-[#6D9D94]/30 ml-3 sm:ml-4 pt-2">
+            <div className="space-y-3">
               {activeDay.activities.map((act) => (
-                <div key={act.id} className="relative">
-                  <div className="absolute -left-[31px] sm:-left-[39px] top-4 w-3.5 h-3.5 rounded-full bg-background border-2 border-[#6D9D94]" />
-                  <ActivityCard
-                    activity={act}
-                    editable={true}
-                    onDelete={handleDeleteActivity}
-                  />
-                </div>
+                <ActivityCard
+                  key={act.id}
+                  activity={act}
+                  onDelete={handleDeleteActivity}
+                  editable={true}
+                />
               ))}
 
               {activeDay.activities.length === 0 && !isAddingActivity && (
-                <div className="py-16 text-center text-xs text-[#78848C] space-y-3">
-                  <p>No experiences planned for Day {activeDay.dayNumber} yet.</p>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                <div className="text-center py-12 glass-card rounded-2xl border border-white/10 space-y-2">
+                  <Clock className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
+                  <p className="text-xs text-[#94a3b8]">No activities planned for {activeDay.title}.</p>
+                  <button
                     onClick={() => setIsAddingActivity(true)}
-                    className="rounded-full text-xs"
+                    className="glass-pill px-4 py-1.5 text-xs text-[#e8d5b5] hover:text-white rounded-full cursor-pointer"
                   >
-                    + Add First Activity
-                  </Button>
+                    + Add Experience
+                  </button>
                 </div>
               )}
             </div>
@@ -488,7 +474,14 @@ function ManualPlannerContent() {
 
 export default function ManualPlannerPage() {
   return (
-    <React.Suspense fallback={<div className="py-24 text-center text-xs text-[#78848C]">Loading Manual Studio...</div>}>
+    <React.Suspense
+      fallback={
+        <div className="py-24 text-center space-y-3">
+          <div className="w-8 h-8 border-2 border-[#e8d5b5] border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-xs text-[#94a3b8]">Opening manual builder...</p>
+        </div>
+      }
+    >
       <ManualPlannerContent />
     </React.Suspense>
   )
