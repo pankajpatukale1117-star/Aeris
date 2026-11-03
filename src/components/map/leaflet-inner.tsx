@@ -1,19 +1,19 @@
 "use client"
 
 import * as React from "react"
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMap } from "react-leaflet"
+import { MapContainer, TileLayer, Marker, Popup, Tooltip, Polyline, useMap } from "react-leaflet"
 import L from "leaflet"
 import { MapPoint } from "./trip-map"
 
 // Custom SVG-based Pin Icon matching AERIS's Liquid Glass cyan & champagne palette
 const customIcon = L.divIcon({
   className: "custom-leaflet-marker",
-  html: `<div style="background: #38bdf8; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #050a10; box-shadow: 0 0 16px rgba(56, 189, 248, 0.8); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
-    <div style="background: #e8d5b5; width: 7px; height: 7px; border-radius: 50%;"></div>
+  html: `<div style="background: #38bdf8; width: 28px; height: 28px; border-radius: 50%; border: 3px solid #050a10; box-shadow: 0 0 18px rgba(56, 189, 248, 0.9); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">
+    <div style="background: #e8d5b5; width: 8px; height: 8px; border-radius: 50%;"></div>
   </div>`,
-  iconSize: [26, 26],
-  iconAnchor: [13, 13],
-  popupAnchor: [0, -14],
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+  popupAnchor: [0, -16],
 })
 
 // Component to dynamically fit bounds when points or routes change
@@ -91,11 +91,27 @@ export function LeafletInner({ points, center, zoom, routeCoordinates }: Leaflet
 
       {points.map((point) => (
         <Marker key={point.id} position={[point.lat, point.lng]} icon={customIcon}>
-          <Popup>
-            <div className="p-1 text-xs font-sans text-slate-900">
-              <strong className="block text-sm font-semibold">{point.title}</strong>
+          {/* Permanent high-contrast badge visible directly on the map */}
+          <Tooltip
+            permanent={true}
+            direction="top"
+            offset={[0, -16]}
+            className="aeris-map-label"
+          >
+            <div className="flex items-center gap-1.5 px-2 py-0.5 text-[11px] font-semibold text-white">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shrink-0 inline-block"></span>
+              <span className="truncate max-w-[200px] text-white font-sans">{point.title}</span>
+            </div>
+          </Tooltip>
+
+          {/* Detailed rich popup on click */}
+          <Popup className="aeris-map-popup">
+            <div className="p-2 text-xs font-sans text-white">
+              <strong className="block text-sm font-bold text-white tracking-wide mb-1">
+                {point.title}
+              </strong>
               {point.category && (
-                <span className="text-[#0284c7] font-semibold uppercase text-[10px] block mt-0.5 tracking-wider">
+                <span className="text-[#38bdf8] font-bold uppercase text-[10px] inline-block tracking-wider bg-[#38bdf8]/15 border border-[#38bdf8]/35 px-2.5 py-0.5 rounded-full">
                   {point.category}
                 </span>
               )}

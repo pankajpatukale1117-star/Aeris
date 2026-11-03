@@ -316,18 +316,85 @@ button {
   background: rgba(232, 213, 181, 0.4);
 }
 
-/* Leaflet Dark Map overrides */
+/* Leaflet Dark Map & High-Contrast Typography overrides */
 .leaflet-container {
   background-color: #050a10 !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
 }
+
+/* Enhanced contrast & sharpness for street names and geography on dark tiles */
+.leaflet-tile-pane {
+  filter: brightness(1.2) contrast(1.25);
+}
+
 .leaflet-popup-content-wrapper {
-  background: rgba(10, 18, 30, 0.95) !important;
-  color: #f1f5f9 !important;
-  backdrop-filter: blur(16px) !important;
-  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  background: rgba(8, 15, 26, 0.98) !important;
+  color: #ffffff !important;
+  backdrop-filter: blur(20px) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
   border-radius: 1rem !important;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 16px rgba(56, 189, 248, 0.25) !important;
 }
+
+.leaflet-popup-content {
+  color: #ffffff !important;
+  margin: 10px 14px !important;
+  line-height: 1.4 !important;
+}
+
+.leaflet-popup-content * {
+  color: #ffffff !important;
+}
+
 .leaflet-popup-tip {
-  background: rgba(10, 18, 30, 0.95) !important;
+  background: rgba(8, 15, 26, 0.98) !important;
+  border: 1px solid rgba(56, 189, 248, 0.4) !important;
+}
+
+.leaflet-popup-close-button {
+  color: #e8d5b5 !important;
+  padding: 8px 10px !important;
+}
+
+.leaflet-popup-close-button:hover {
+  color: #38bdf8 !important;
+}
+
+/* Sightseeing permanent label on maps with high-contrast text */
+.leaflet-tooltip.aeris-map-label {
+  background: rgba(5, 10, 16, 0.95) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(56, 189, 248, 0.5) !important;
+  border-radius: 9999px !important;
+  padding: 4px 10px !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.85), 0 0 12px rgba(56, 189, 248, 0.35) !important;
+  backdrop-filter: blur(14px) !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  white-space: nowrap !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.leaflet-tooltip.aeris-map-label:hover {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 4px 24px rgba(56, 189, 248, 0.6) !important;
+  transform: translateY(-2px) scale(1.03);
+}
+
+.leaflet-tooltip.aeris-map-label span,
+.leaflet-tooltip.aeris-map-label div {
+  color: #ffffff !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+}
+
+.leaflet-tooltip-top.aeris-map-label::before {
+  border-top-color: rgba(5, 10, 16, 0.95) !important;
+}
+
+.leaflet-tooltip-bottom.aeris-map-label::before {
+  border-bottom-color: rgba(5, 10, 16, 0.95) !important;
 }
