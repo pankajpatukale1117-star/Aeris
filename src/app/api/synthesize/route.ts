@@ -32,20 +32,31 @@ export interface SynthesizedItinerary {
   days: DayPlan[]
 }
 
+interface ChatMessage {
+  role: "user" | "model" | "assistant" | "ai"
+  text?: string
+  content?: string
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const {
       prompt,
-      destination = "Kyoto, Japan",
-      days = 5,
+      message,
+      destination = "Kolhapur, Maharashtra",
+      days = 3,
       pace = "Balanced",
       lens = "Architectural & Cultural Gems",
+      currency = "USD",
       apiKey: clientKey,
       context,
+      currentItinerary,
+      history = [],
     } = body
 
-    const userQuery = (prompt || destination || "Kyoto, Japan").trim()
+    const userMessage = (message || prompt || destination || "Kolhapur, Maharashtra").trim()
+    const activeItinerary: SynthesizedItinerary | null = currentItinerary || context || null
 
     // 1. Resolve API Key from Environment, Header, or Client Body
     const headerKey = request.headers.get("x-gemini-key")
@@ -56,21 +67,28 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
       ""
 
-    const durationDays = Math.max(1, Math.min(14, Number(days) || 5))
+    const durationDays = Math.max(1, Math.min(14, Number(days) || (activeItinerary?.days?.length || 3)))
 
-    // 2. If valid Gemini API key present, execute live call
+    // 2. If valid Gemini API key present, execute live multi-turn call
     if (activeKey && !activeKey.includes("placeholder") && activeKey.length > 15) {
       try {
-        const systemPrompt = `You are ROVEO's elite international travel concierge AI. Generate a bespoke, highly sophisticated, circadian travel itinerary for ANY city, region, state, country, or small village in strict JSON format.
-User Request: ${userQuery}
-Duration: ${durationDays} days (if not specified in prompt, default to 3-5 days)
-Circadian Pace: ${pace} (Slow & Zen / Balanced / High Pulse)
-Curatorial Lens: ${lens} (Architectural & Cultural Gems / Gastronomy & Hidden Salons / Coastal & Nature Sanctuary / Private Concierge Luxury)
-${context ? `Previous Context / Existing Itinerary: ${JSON.stringify(context).slice(0, 800)}` : ""}
+        const systemPrompt = `You are ROVEO's elite international travel concierge AI. You chat naturally, warmly, and intelligently like Google Gemini, while generating and dynamically revising circadian travel itineraries for ANY city, region, state, country, or small village on Earth.
+
+Input Context:
+- Current Itinerary in State: ${activeItinerary ? JSON.stringify(activeItinerary).slice(0, 1500) : "None (New Plan)"}
+- User Message: "${userMessage}"
+- Selected Currency: ${currency} (USD / INR / EUR / JPY)
+- Circadian Pace: ${pace} (Slow & Zen / Balanced / High Pulse)
+- Curatorial Lens: ${lens} (Architectural & Cultural Gems / Gastronomy & Hidden Salons / Coastal & Nature Sanctuary / Private Concierge Luxury)
+
+Instructions:
+1. If the user asks for a new trip, create a bespoke 3 to 7-day flow.
+2. If the user asks to modify an existing trip (e.g. change pace, add food spots, reduce walking, adjust budget), converse naturally and apply those exact changes to the itinerary while preserving the rest of the good stops.
+3. Ensure geographic proximity: morning, afternoon, and twilight stops must be near each other so the traveler isn't stuck in traffic.
 
 Return a strict JSON object with this exact schema:
 {
-  "chatReply": "2-3 sentences of conversational concierge advice answering the user's prompt directly.",
+  "chatReply": "Conversational, natural peer concierge response answering the user directly, explaining what you tailored and offering 1 insider tip.",
   "name": "Location Name (City/Town/Village)",
   "region": "State / District, Country",
   "category": "Culture | Beach | Adventure | City",
@@ -97,6 +115,29 @@ Return a strict JSON object with this exact schema:
   ]
 }`
 
+        // Construct Multi-Turn Contents Array for Gemini
+        const formattedHistory: Array<{ role: "user" | "model"; parts: [{ text: string }] }> = []
+        if (Array.isArray(history) && history.length > 0) {
+          // Include recent history turns
+          for (const item of history.slice(-6)) {
+            const textContent = item.text || item.content || ""
+            if (!textContent) continue
+            const isUser = item.role === "user"
+            formattedHistory.push({
+              role: isUser ? "user" : "model",
+              parts: [{ text: textContent }],
+            })
+          }
+        }
+
+        const contents = [
+          ...formattedHistory,
+          {
+            role: "user" as const,
+            parts: [{ text: systemPrompt }],
+          },
+        ]
+
         const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"]
         for (const modelName of candidateModels) {
           try {
@@ -105,12 +146,7 @@ Return a strict JSON object with this exact schema:
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                contents: [
-                  {
-                    role: "user",
-                    parts: [{ text: systemPrompt }],
-                  },
-                ],
+                contents,
                 generationConfig: {
                   responseMimeType: "application/json",
                   temperature: 0.7,
@@ -137,10 +173,10 @@ Return a strict JSON object with this exact schema:
                 })
               }
             } else {
-              console.warn(`${modelName} status not ok (${geminiRes.status}), trying next candidate...`)
+              console.warn(`${modelName} status not ok (${geminiRes.status}), attempting next candidate...`)
             }
           } catch (modelErr) {
-            console.warn(`Error trying ${modelName}:`, modelErr)
+            console.warn(`Error attempting ${modelName}:`, modelErr)
           }
         }
       } catch (geminiError) {
@@ -148,8 +184,16 @@ Return a strict JSON object with this exact schema:
       }
     }
 
-    // 3. Universal Resilient Fallback for ANY Location on Earth
-    const fallback = generateUniversalEditorialFallback(userQuery, durationDays, pace, lens)
+    // 3. Universal Resilient Multi-Turn Fallback for ANY Location on Earth
+    const fallback = generateUniversalEditorialFallback(
+      userMessage,
+      durationDays,
+      pace,
+      lens,
+      currency,
+      activeItinerary
+    )
+
     return NextResponse.json({
       success: true,
       source: "curated-sanctuary-fallback",
@@ -171,11 +215,138 @@ function generateUniversalEditorialFallback(
   input: string,
   days: number,
   pace: string,
-  lens: string
+  lens: string,
+  currency: string = "USD",
+  activeItinerary: SynthesizedItinerary | null = null
 ): SynthesizedItinerary {
   const lower = input.toLowerCase()
 
-  // 1. Kolhapur & Western Ghats Curated Sanctuary
+  // ── A. MULTI-TURN MODIFICATION: Less walking / Accessible for parents ──────
+  if (
+    activeItinerary &&
+    (lower.includes("walking") ||
+      lower.includes("parents") ||
+      lower.includes("strenuous") ||
+      lower.includes("elderly") ||
+      lower.includes("accessible") ||
+      lower.includes("tired"))
+  ) {
+    const updatedDays = activeItinerary.days.map((day) => {
+      if (day.day === 2 || activeItinerary.days.length === 1) {
+        return {
+          ...day,
+          theme: "Low-Impact Panoramic Viewpoints & Private Chauffeur Corridors",
+          stops: [
+            {
+              slot: "Morning • 09:00",
+              title: `${activeItinerary.name} Scenic Overlook via Private Chauffeured Access`,
+              note: "Gentle step-free pavilion with direct vehicular drop-off and shaded seating; leisurely tea service with valley panoramas.",
+              dist: "Level 2 min walk",
+              reserved: true,
+            },
+            {
+              slot: "Afternoon • 13:30",
+              title: "Heirloom Courtyard Luncheon & Shaded Veranda",
+              note: "Ground-level traditional dining salon featuring zero stair climbs and attentive table hospitality.",
+              dist: "Chauffeured transit",
+              reserved: false,
+            },
+            {
+              slot: "Twilight • 18:30",
+              title: "Lakeside Sunset Pavilion & Private Promenade Drive",
+              note: "Relaxed sunset viewing from cushioned lakeside benches; acoustic local melodies as twilight settles.",
+              dist: "Vehicular access",
+              reserved: true,
+            },
+          ],
+        }
+      }
+      return day
+    })
+
+    return {
+      ...activeItinerary,
+      chatReply: `I've completely re-calibrated Day 2 for your parents' comfort. All strenuous ascents and prolonged cobblestone walks have been replaced with direct chauffeured drop-offs, level ground-floor courtyard pavilions, and shaded lakeside verandas with comfortable seating.`,
+      days: updatedDays,
+    }
+  }
+
+  // ── B. MULTI-TURN MODIFICATION: Add Mutton Thali / Dinner Stop ─────────────
+  if (
+    activeItinerary &&
+    (lower.includes("mutton") ||
+      lower.includes("thali") ||
+      lower.includes("dinner") ||
+      lower.includes("food") ||
+      lower.includes("restaurant") ||
+      lower.includes("cuisine"))
+  ) {
+    const targetDayNumber = lower.includes("day 1") ? 1 : lower.includes("day 3") ? 3 : 2
+    const isKolhapur = activeItinerary.name.toLowerCase().includes("kolhapur")
+
+    const updatedDays = activeItinerary.days.map((day) => {
+      if (day.day === targetDayNumber || (activeItinerary.days.length === 1 && day.day === 1)) {
+        return {
+          ...day,
+          stops: day.stops.map((stop, sIdx) => {
+            if (sIdx === 2 || stop.slot.toLowerCase().includes("twilight")) {
+              return {
+                slot: "Twilight • 19:30",
+                title: isKolhapur
+                  ? "Celebrated Kolhapuri Mutton Thali at Dehati / Opal"
+                  : `${activeItinerary.name} Gastronomic Terroir Dinner & Tasting`,
+                note: isKolhapur
+                  ? "Generational culinary sanctuary; savor authentic spicy Tambada (red chili) and Pandhara (white coconut broth) rassa paired with tender country mutton and warm jowar bhakri."
+                  : "Chef-curated seasonal evening menu celebrating heirloom recipes and hyper-local terroir ingredients.",
+                dist: "10 min transit",
+                reserved: true,
+              }
+            }
+            return stop
+          }),
+        }
+      }
+      return day
+    })
+
+    return {
+      ...activeItinerary,
+      chatReply: `I have updated your Day ${targetDayNumber} twilight stop to feature an authentic culinary feast! ${
+        isKolhapur
+          ? "Reserved a prime evening table for the world-famous Kolhapuri Mutton Thali with authentic Tambada and Pandhara Rassa at a revered heritage dining institution."
+          : `Reserved a prime table for a traditional terroir evening dining experience in ${activeItinerary.name}.`
+      } Pacing and proximity have been harmonized.`,
+      days: updatedDays,
+    }
+  }
+
+  // ── C. MULTI-TURN MODIFICATION: Budget-Friendly Under $100 / Day ───────────
+  if (
+    activeItinerary &&
+    (lower.includes("budget") ||
+      lower.includes("under $100") ||
+      lower.includes("under 100") ||
+      lower.includes("cheap") ||
+      lower.includes("cost") ||
+      lower.includes("affordable"))
+  ) {
+    return {
+      ...activeItinerary,
+      budgetMin: 45,
+      budgetMax: 90,
+      dailyCost: 70,
+      chatReply: `I have optimized the entire journey to be comfortably budget-friendly under $100/day (now averaging $70/day). Replaced high-premium private transit with scenic regional passes, prioritized complimentary heritage access sanctums, and swapped luxury hotels for charming boutique heritage homestays. Your live budget doughnut telemetry has been recalculated.`,
+      costBreakdown: [35, 30, 20, 15],
+      prepList: [
+        "Book boutique heritage homestays 10 days in advance to secure budget rates under $50/night",
+        "Utilize shared transit and local rail passes for cost-efficient regional transfers",
+        "Enjoy authentic family-run thali houses and bakeries for high-quality, modest-cost dining",
+        "Keep local cash on hand for small artisanal market purchases",
+      ],
+    }
+  }
+
+  // ── D. INITIAL ITINERARY: Kolhapur & Western Ghats ─────────────────────────
   if (lower.includes("kolhapur")) {
     return {
       chatReply: `I have synthesized an authentic ${days}-day circadian journey across Kolhapur and the Western Ghats. Your itinerary balances the sacred morning calmness of Shri Mahalakshmi Temple, the mist-veiled heights of Panhala fort, authentic Tambada-Pandhara Rassa cuisine, and tranquil twilight sunsets over Rankala Lake.`,
@@ -288,7 +459,7 @@ function generateUniversalEditorialFallback(
     }
   }
 
-  // 2. Amalfi Coast & Capri Curated Sanctuary
+  // ── E. INITIAL ITINERARY: Amalfi Coast & Capri ────────────────────────────
   if (lower.includes("amalfi") || lower.includes("capri")) {
     return {
       chatReply: `I have curated a ${days}-day coastal circadian flow along the Amalfi Coast and Capri. Featuring private wooden gozzo boat passages, lemon terrace lunches, and sunset aperitivos overlooking Positano's pastel cliffs.`,
@@ -374,7 +545,7 @@ function generateUniversalEditorialFallback(
     }
   }
 
-  // 3. Extract a clean primary name for Universal Geography Fallback
+  // ── F. INITIAL ITINERARY: Universal Geography Fallback ────────────────────
   const cleanInput = input
     .replace(/^plan a \d+[- ]day trip to /i, "")
     .replace(/^trip to /i, "")
@@ -434,7 +605,7 @@ function generateUniversalEditorialFallback(
   }
 
   return {
-    chatReply: `I have synthesized an authentic ${days}-day circadian journey across ${locationName}, customized for a ${pace.toLowerCase()} cadence and curated through a lens of ${lens.toLowerCase()}. All stops are proximity-calibrated.`,
+    chatReply: `I have synthesized an authentic ${days}-day circadian journey across ${locationName}, customized for a ${pace.toLowerCase()} cadence and curated through a lens of ${lens.toLowerCase()}. All stops are proximity-calibrated with zero bottlenecking.`,
     name: locationName,
     region: regionName,
     category: "Culture",

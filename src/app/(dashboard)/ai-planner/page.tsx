@@ -30,12 +30,26 @@ import {
   Copy,
   Layers,
   Share2,
+  PieChart,
+  User,
+  Bot,
+  RotateCcw,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
 import { useGeminiStore } from "@/lib/gemini-store"
 import { DESTINATIONS } from "@/lib/constants"
 import { SynthesizedItinerary } from "@/app/api/synthesize/route"
+import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
+
+type CurrencyCode = "USD" | "INR" | "EUR" | "JPY"
+
+const CURRENCIES: Array<{ code: CurrencyCode; symbol: string; rate: number; label: string }> = [
+  { code: "USD", symbol: "$", rate: 1, label: "USD ($)" },
+  { code: "INR", symbol: "₹", rate: 85, label: "INR (₹)" },
+  { code: "EUR", symbol: "€", rate: 0.92, label: "EUR (€)" },
+  { code: "JPY", symbol: "¥", rate: 155, label: "JPY (¥)" },
+]
 
 const CURATORIAL_LENSES = [
   { id: "Architectural & Cultural Gems", label: "Architectural & Cultural Gems", icon: "🏛️" },
@@ -59,40 +73,48 @@ const QUICK_SANCTUARIES = [
   "Hallstatt, Austria",
 ]
 
-const QUICK_PROMPT_PILLS = [
+const QUICK_PROMPT_CHIPS = [
   {
-    label: "📍 3 Days in Kolhapur & Western Ghats",
-    query: "Plan a 3-day trip to Kolhapur exploring historic Mahalakshmi temple, Panhala fort, authentic Kolhapuri cuisine, and serene Western Ghats sunsets",
+    label: "📍 4 Days in Kolhapur & Panhala fort",
+    query: "Plan 4 days in Kolhapur exploring historic temples, Panhala fort, and authentic food",
     dest: "Kolhapur, Maharashtra, India",
-    days: 3,
-    pace: "Balanced",
-    lens: "Architectural & Cultural Gems",
+    days: 4,
+  },
+  {
+    label: "🚶 Adjust day 2 with less walking for parents",
+    query: "Actually, my parents can't walk long distances, adjust day 2 with less walking",
+    isModification: true,
+  },
+  {
+    label: "🍲 Add traditional Kolhapuri mutton thali dinner",
+    query: "Add a traditional Kolhapuri mutton thali spot for dinner",
+    isModification: true,
+  },
+  {
+    label: "💵 Make the whole trip budget-friendly under $100/day",
+    query: "Can we make the whole trip budget-friendly under $100 a day?",
+    isModification: true,
   },
   {
     label: "🍋 5 Days in Amalfi & Capri with private boat",
-    query: "Plan a 5-day escape along the Amalfi Coast and Capri featuring private coastal boat excursions, lemon grove terraces, and cliffside dining",
+    query: "Plan 5 days in Amalfi Coast and Capri with a private boat charter and cliffside dining",
     dest: "Amalfi Coast, Italy",
     days: 5,
-    pace: "Balanced",
-    lens: "Coastal & Nature Sanctuary",
   },
   {
     label: "⛩️ Slow-paced Zen retreat in Kyoto temples",
-    query: "Plan a slow-paced 4-day Zen retreat in Kyoto exploring secluded bamboo groves, tea ceremonies, morning meditation, and traditional temple architecture",
+    query: "Plan a slow-paced 4-day Zen retreat in Kyoto exploring secluded bamboo groves and tea ceremonies",
     dest: "Kyoto, Japan",
     days: 4,
-    pace: "Slow & Zen",
-    lens: "Architectural & Cultural Gems",
-  },
-  {
-    label: "🏔️ Offbeat Alpine escape in Zermatt & Lauterbrunnen",
-    query: "Plan an offbeat 5-day Alpine escape in Zermatt and Lauterbrunnen valley with panoramic glacier trails, secluded chalets, and mountain rail journeys",
-    dest: "Zermatt, Switzerland",
-    days: 5,
-    pace: "Balanced",
-    lens: "Coastal & Nature Sanctuary",
   },
 ]
+
+interface ConversationMessage {
+  id: string
+  role: "user" | "ai"
+  text: string
+  timestamp: string
+}
 
 function AIPlannerContent() {
   const searchParams = useSearchParams()
@@ -103,32 +125,51 @@ function AIPlannerContent() {
 
   const prefillDestination = searchParams.get("destination") || ""
 
-  // Form State
+  // Core Expedition Form Controls
   const [destination, setDestination] = React.useState(prefillDestination || "Kolhapur, Maharashtra")
   const [days, setDays] = React.useState(3)
   const [pace, setPace] = React.useState("Balanced")
   const [lens, setLens] = React.useState("Architectural & Cultural Gems")
+  const [currency, setCurrency] = React.useState<CurrencyCode>("USD")
 
-  // Conversational AI Chat State
+  // Multi-Turn Conversational Memory State
   const [conversationalInput, setConversationalInput] = React.useState("")
-  const [chatHistory, setChatHistory] = React.useState<Array<{ role: "user" | "ai"; text: string }>>([])
+  const [conversationHistory, setConversationHistory] = React.useState<ConversationMessage[]>([
+    {
+      id: "welcome-1",
+      role: "ai",
+      text: "Greetings. I am ROVEO's Multi-Turn Concierge Engine. Request any expedition on Earth in natural prose, or ask me to modify an existing itinerary on the fly (e.g. reduce walking for family, add authentic dining, or adjust daily budgets).",
+      timestamp: "Just now",
+    },
+  ])
 
-  // Output & Loading State
-  const [loading, setLoading] = React.useState(false)
-  const [loadingStage, setLoadingStage] = React.useState(1)
-  const [progressPercent, setProgressPercent] = React.useState(15)
+  // Active Itinerary State
   const [itinerary, setItinerary] = React.useState<SynthesizedItinerary | null>(null)
   const [selectedDay, setSelectedDay] = React.useState(1)
   const [sourceModel, setSourceModel] = React.useState<string>("")
 
-  // Pre-load from query param if available
+  // Ultra-Smooth Multi-Stage Loading Transitions State
+  const [loading, setLoading] = React.useState(false)
+  const [loadingStage, setLoadingStage] = React.useState(1)
+  const [progressPercent, setProgressPercent] = React.useState(15)
+
+  const chatContainerRef = React.useRef<HTMLDivElement | null>(null)
+
+  // Scroll chat to bottom on new messages
+  React.useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight
+    }
+  }, [conversationHistory, loading])
+
+  // Handle URL prefill destination
   React.useEffect(() => {
     if (prefillDestination) {
       setDestination(prefillDestination)
     }
   }, [prefillDestination])
 
-  // Multi-stage loading progress ticker
+  // Multi-Stage animated progress ticker
   React.useEffect(() => {
     let t1: NodeJS.Timeout
     let t2: NodeJS.Timeout
@@ -136,20 +177,20 @@ function AIPlannerContent() {
 
     if (loading) {
       setLoadingStage(1)
-      setProgressPercent(22)
+      setProgressPercent(24)
 
       t1 = setTimeout(() => {
         setLoadingStage(2)
-        setProgressPercent(60)
-      }, 900)
+        setProgressPercent(64)
+      }, 950)
 
       t2 = setTimeout(() => {
         setLoadingStage(3)
-        setProgressPercent(88)
+        setProgressPercent(89)
       }, 2100)
 
       t3 = setTimeout(() => {
-        setProgressPercent(96)
+        setProgressPercent(97)
       }, 3400)
     }
 
@@ -160,25 +201,40 @@ function AIPlannerContent() {
     }
   }, [loading])
 
-  // Core synthesis executor
-  const executeSynthesis = async (params: {
-    promptQuery: string
-    targetDest?: string
-    targetDays?: number
-    targetPace?: string
-    targetLens?: string
-    isFollowUp?: boolean
+  // Currency Converter Helpers
+  const activeCurrencyConfig = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]
+  const convertAmount = (usdAmount: number) => Math.round(usdAmount * activeCurrencyConfig.rate)
+
+  // Core Multi-Turn Synthesize / Mutate Executor
+  const executeMultiTurnQuery = async (params: {
+    queryText: string
+    overrideDest?: string
+    overrideDays?: number
+    overridePace?: string
+    overrideLens?: string
   }) => {
-    const { promptQuery, targetDest, targetDays, targetPace, targetLens, isFollowUp } = params
+    const { queryText, overrideDest, overrideDays, overridePace, overrideLens } = params
+    if (!queryText.trim() || loading) return
+
+    const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+
+    // 1. Immediately append user message to multi-turn conversation memory
+    const userMsg: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: "user",
+      text: queryText,
+      timestamp: nowTime,
+    }
+
+    const updatedHistory = [...conversationHistory, userMsg]
+    setConversationHistory(updatedHistory)
+    setConversationalInput("")
     setLoading(true)
 
-    // Add query to chat history
-    setChatHistory((prev) => [...prev, { role: "user", text: promptQuery }])
-
-    const activeDest = targetDest || destination
-    const activeDays = targetDays || days
-    const activePace = targetPace || pace
-    const activeLens = targetLens || lens
+    const targetDest = overrideDest || destination
+    const targetDays = overrideDays || days
+    const targetPace = overridePace || pace
+    const targetLens = overrideLens || lens
 
     try {
       const res = await fetch("/api/synthesize", {
@@ -188,13 +244,19 @@ function AIPlannerContent() {
           "x-gemini-key": apiKey || "",
         },
         body: JSON.stringify({
-          prompt: promptQuery,
-          destination: activeDest,
-          days: activeDays,
-          pace: activePace,
-          lens: activeLens,
+          prompt: queryText,
+          message: queryText,
+          destination: targetDest,
+          days: targetDays,
+          pace: targetPace,
+          lens: targetLens,
+          currency,
           apiKey,
-          context: isFollowUp && itinerary ? itinerary : undefined,
+          currentItinerary: itinerary,
+          history: updatedHistory.map((m) => ({
+            role: m.role === "user" ? "user" : "model",
+            text: m.text,
+          })),
         }),
       })
 
@@ -203,22 +265,24 @@ function AIPlannerContent() {
         setItinerary(data.itinerary)
         setSourceModel(data.source || (hasKey ? "gemini-2.5-flash" : "curated-sanctuary"))
         setSelectedDay(1)
-        if (targetDest) setDestination(targetDest)
-        if (targetDays) setDays(targetDays)
-        if (targetPace) setPace(targetPace)
-        if (targetLens) setLens(targetLens)
+        if (data.itinerary.name) setDestination(data.itinerary.name)
+        if (data.itinerary.days?.length) setDays(data.itinerary.days.length)
 
-        // Append AI response to chat history
-        if (data.itinerary.chatReply) {
-          setChatHistory((prev) => [
-            ...prev,
-            { role: "ai", text: data.itinerary.chatReply },
-          ])
-        }
+        // 2. Append AI Concierge response to conversation history
+        const aiReply = data.itinerary.chatReply || `I have updated your circadian flow for ${data.itinerary.name}.`
+        setConversationHistory((prev) => [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            role: "ai",
+            text: aiReply,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          },
+        ])
 
         toast({
-          title: isFollowUp ? "Itinerary Refined" : "Itinerary Synthesized",
-          description: `Circadian blueprint for ${data.itinerary.name || activeDest} is ready.`,
+          title: itinerary ? "Itinerary Mutated" : "Itinerary Synthesized",
+          description: `Circadian blueprint for ${data.itinerary.name} updated.`,
         })
       } else {
         throw new Error(data.error || "Synthesis failed")
@@ -235,47 +299,47 @@ function AIPlannerContent() {
   }
 
   // Handle Form Submit from Left Studio Controls
-  const handleFormSynthesize = (e: React.FormEvent) => {
+  const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    executeSynthesis({
-      promptQuery: `Curate a ${days}-day circadian travel blueprint for ${destination} focusing on ${lens} at a ${pace} pace.`,
-      targetDest: destination,
-      targetDays: days,
-      targetPace: pace,
-      targetLens: lens,
-      isFollowUp: false,
+    executeMultiTurnQuery({
+      queryText: `Curate a ${days}-day circadian travel blueprint for ${destination} focusing on ${lens} at a ${pace} pace.`,
+      overrideDest: destination,
+      overrideDays: days,
+      overridePace: pace,
+      overrideLens: lens,
     })
   }
 
   // Handle Conversational AI Chat Box Submit
   const handleChatSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault()
-    if (!conversationalInput.trim() || loading) return
+    executeMultiTurnQuery({ queryText: conversationalInput.trim() })
+  }
 
-    const query = conversationalInput.trim()
-    setConversationalInput("")
-
-    // Check if it's a follow-up refinement or a new destination query
-    const isFollowUp = Boolean(itinerary)
-    executeSynthesis({
-      promptQuery: query,
-      isFollowUp,
+  // Handle 1-Click Quick Prompt Chips
+  const handleChipClick = (chip: typeof QUICK_PROMPT_CHIPS[0]) => {
+    if (chip.dest) setDestination(chip.dest)
+    if (chip.days) setDays(chip.days)
+    executeMultiTurnQuery({
+      queryText: chip.query,
+      overrideDest: chip.dest,
+      overrideDays: chip.days,
     })
   }
 
-  // Handle 1-click Quick Prompt Pills
-  const handlePillClick = (pill: typeof QUICK_PROMPT_PILLS[0]) => {
-    setDestination(pill.dest)
-    setDays(pill.days)
-    setPace(pill.pace)
-    setLens(pill.lens)
-    executeSynthesis({
-      promptQuery: pill.query,
-      targetDest: pill.dest,
-      targetDays: pill.days,
-      targetPace: pill.pace,
-      targetLens: pill.lens,
-      isFollowUp: false,
+  // Reset Conversation
+  const handleResetChat = () => {
+    setConversationHistory([
+      {
+        id: `welcome-${Date.now()}`,
+        role: "ai",
+        text: "Conversation refreshed. Tell me where you wish to explore next, or what specific experience you desire.",
+        timestamp: "Just now",
+      },
+    ])
+    toast({
+      title: "Chat Thread Reset",
+      description: "Started fresh conversational memory.",
     })
   }
 
@@ -301,7 +365,7 @@ function AIPlannerContent() {
       status: "upcoming",
       planningMode: "AI Architecture",
       daysCount: itinerary.days.length,
-      budget: `$${itinerary.budgetMin} — $${itinerary.budgetMax} / day`,
+      budget: `${activeCurrencyConfig.symbol}${convertAmount(itinerary.budgetMin)} — ${activeCurrencyConfig.symbol}${convertAmount(itinerary.budgetMax)} / day`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       days: itinerary.days.map((d) => ({
@@ -316,7 +380,7 @@ function AIPlannerContent() {
           description: `${s.note} (${s.dist})`,
           duration: "2.5h",
           location: s.dist,
-          estimatedCost: s.reserved ? "$75" : "Complimentary",
+          estimatedCost: s.reserved ? `${activeCurrencyConfig.symbol}${convertAmount(75)}` : "Complimentary",
           category: idx === 0 ? "Cultural" : idx === 1 ? "Food" : "Relaxation",
         })),
       })),
@@ -333,38 +397,56 @@ function AIPlannerContent() {
   // Copy Itinerary Text
   const handleCopyItinerary = () => {
     if (!itinerary) return
-    const textSummary = `ROVEO Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nDays:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note})`).join("\n")}`).join("\n\n")}`
+    const textSummary = `ROVEO Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${activeCurrencyConfig.symbol}${convertAmount(itinerary.dailyCost)} / day\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
     navigator.clipboard.writeText(textSummary)
     toast({
       title: "Copied to Clipboard",
-      description: "Itinerary summary copied successfully.",
+      description: "Complete itinerary blueprint copied.",
     })
   }
 
   return (
     <div className="space-y-8 animate-reveal max-w-7xl mx-auto pb-24">
-      {/* ─── Studio Header ─────────────────────────────────────────────────── */}
+      {/* ─── Studio Top Header & Telemetry ─────────────────────────────────── */}
       <div className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/10 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#38bdf8]/15 via-[#e8d5b5]/5 to-transparent blur-3xl pointer-events-none" />
 
         <div className="space-y-2 relative z-10">
           <div className="inline-flex items-center gap-2 glass-pill px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-[#e8d5b5]">
             <Sparkles className="w-3 h-3 text-[#38bdf8]" />
-            Bespoke Circadian Engine
+            Multi-Turn Gemini Travel Concierge
           </div>
           <h1 className="font-editorial text-3xl sm:text-5xl font-medium tracking-tight text-[#f1f5f9]">
-            AI Travel <span className="italic text-[#e8d5b5]">Concierge</span>
+            ROVEO <span className="italic text-[#e8d5b5]">Concierge Studio</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-light">
-            Your journey, your way. Curate circadian blueprints for any city, state, or small village on Earth in natural prose.
+            Your journey, your way. Chat naturally to generate or adapt live itineraries for any village, town, or metropolis on Earth.
           </p>
         </div>
 
-        {/* Header Right Actions */}
-        <div className="flex flex-wrap items-center gap-3 relative z-10">
+        {/* Currency & API Settings Controls */}
+        <div className="flex flex-wrap items-center gap-2.5 relative z-10">
+          {/* Currency Switcher */}
+          <div className="flex items-center glass-pill rounded-full p-1 border border-white/10">
+            {CURRENCIES.map((c) => (
+              <button
+                key={c.code}
+                onClick={() => setCurrency(c.code)}
+                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all ${
+                  currency === c.code
+                    ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_10px_rgba(232,213,181,0.4)]"
+                    : "text-slate-300 hover:text-white"
+                }`}
+              >
+                {c.symbol} {c.code}
+              </button>
+            ))}
+          </div>
+
+          {/* Gemini Key Pill */}
           <button
             onClick={openModal}
-            className="glass-pill px-4 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer"
+            className="glass-pill px-3.5 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer"
           >
             <span
               className={`w-2 h-2 rounded-full ${
@@ -376,7 +458,7 @@ function AIPlannerContent() {
 
           <Link
             href="/destinations"
-            className="glass-pill px-4 py-2 text-xs font-medium text-slate-200 hover:text-white flex items-center gap-2 transition-all hover:border-[#38bdf8]/50"
+            className="glass-pill px-3.5 py-2 text-xs font-medium text-slate-200 hover:text-white flex items-center gap-1.5 transition-all hover:border-[#38bdf8]/50"
           >
             <Compass className="w-3.5 h-3.5 text-[#38bdf8]" />
             <span>Atlas</span>
@@ -384,61 +466,101 @@ function AIPlannerContent() {
         </div>
       </div>
 
-      {/* ─── 1. INTERACTIVE CONVERSATIONAL AI CHAT BOX (PROMINENT TOP HERO) ── */}
-      <div className="glass-shell rounded-3xl p-5 sm:p-7 border border-white/15 shadow-2xl relative overflow-hidden space-y-5">
+      {/* ─── 1. REAL MULTI-TURN CONVERSATIONAL AI CHAT STUDIO (PROMINENT HERO) ─ */}
+      <div className="glass-shell rounded-3xl p-5 sm:p-7 border border-white/15 shadow-2xl relative overflow-hidden space-y-4">
         <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-[#e8d5b5]/10 via-[#38bdf8]/10 to-transparent blur-3xl pointer-events-none" />
 
-        {/* Chat Box Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+        {/* Chat Studio Bar Header */}
+        <div className="flex items-center justify-between border-b border-white/10 pb-3 relative z-10">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-[#e8d5b5] shadow-[0_0_12px_rgba(232,213,181,0.3)]">
-              <Sparkles className="w-4 h-4 text-[#38bdf8]" />
+              <Bot className="w-4 h-4 text-[#38bdf8]" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-white tracking-wide flex items-center gap-2">
-                <span>Conversational AI Concierge</span>
+                <span>Multi-Turn Conversational Memory</span>
                 <span className="text-[10px] font-normal uppercase tracking-widest text-[#e8d5b5] glass-pill px-2 py-0.5 rounded-full">
-                  Universal Geography
+                  Live Itinerary Mutation
                 </span>
               </h2>
               <p className="text-[11px] text-slate-400 font-light">
-                Ask in natural language for any village, town, or capital on Earth. Follow up anytime to refine.
+                Chat naturally to adjust pacing, swap stops, reduce walking, or alter budgets on the fly.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-[#38bdf8] font-mono">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] animate-pulse" />
-            <span>Ready for input</span>
-          </div>
+          <button
+            onClick={handleResetChat}
+            className="text-[11px] glass-pill px-3 py-1.5 rounded-full text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Reset Chat Memory"
+          >
+            <RotateCcw className="w-3 h-3 text-[#38bdf8]" />
+            <span className="hidden sm:inline">New Thread</span>
+          </button>
         </div>
 
-        {/* Conversational Transcript History (if messages exist) */}
-        {chatHistory.length > 0 && (
-          <div className="space-y-3 max-h-64 overflow-y-auto pr-1 relative z-10 scrollbar-none pt-2 border-t border-white/10">
-            {chatHistory.map((msg, idx) => (
-              <div
-                key={idx}
-                className={`p-3.5 rounded-2xl text-xs leading-relaxed transition-all ${
-                  msg.role === "user"
-                    ? "bg-[#38bdf8]/15 text-white ml-auto max-w-xl border border-[#38bdf8]/30 shadow-sm"
-                    : "glass-card text-slate-200 mr-auto max-w-2xl border-white/15 border-l-4 border-l-[#e8d5b5]"
-                }`}
-              >
-                <div className="text-[10px] uppercase tracking-wider font-semibold mb-1 opacity-70">
-                  {msg.role === "user" ? "You" : "ROVEO Concierge"}
+        {/* Liquid Glass Multi-Turn Chat Thread */}
+        <div
+          ref={chatContainerRef}
+          className="space-y-3 max-h-72 sm:max-h-80 overflow-y-auto pr-1 relative z-10 scrollbar-none pt-1"
+        >
+          {conversationHistory.map((msg) => (
+            <div
+              key={msg.id}
+              className={`p-4 rounded-2xl text-xs leading-relaxed transition-all relative ${
+                msg.role === "user"
+                  ? "bg-[#38bdf8]/15 text-white ml-auto max-w-xl border border-[#38bdf8]/35 shadow-md"
+                  : "glass-card text-slate-100 mr-auto max-w-2xl border-white/15 border-l-4 border-l-[#e8d5b5] shadow-lg"
+              }`}
+            >
+              <div className="flex items-center justify-between text-[10px] uppercase tracking-wider font-semibold mb-1 opacity-75">
+                <div className="flex items-center gap-1.5">
+                  {msg.role === "user" ? (
+                    <>
+                      <User className="w-3 h-3 text-[#38bdf8]" />
+                      <span>You</span>
+                    </>
+                  ) : (
+                    <>
+                      <Bot className="w-3 h-3 text-[#e8d5b5]" />
+                      <span className="text-[#e8d5b5]">ROVEO Concierge</span>
+                    </>
+                  )}
                 </div>
-                <p className="font-light">{msg.text}</p>
+                <span className="text-slate-400 font-mono text-[9px]">{msg.timestamp}</span>
               </div>
-            ))}
-          </div>
-        )}
+              <p className="font-light text-slate-200 text-xs sm:text-[13px] leading-relaxed whitespace-pre-line">
+                {msg.text}
+              </p>
+            </div>
+          ))}
 
-        {/* Responsive Natural Language Input Bar */}
-        <form onSubmit={handleChatSubmit} className="relative z-10">
+          {/* Live Typing & Shimmer Indicator while Generating */}
+          {loading && (
+            <div className="glass-card p-4 rounded-2xl mr-auto max-w-md border-white/15 border-l-4 border-l-[#38bdf8] space-y-2 animate-reveal">
+              <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-[#38bdf8]">
+                <Sparkles className="w-3 h-3 animate-spin" />
+                <span>Concierge is synthesizing...</span>
+              </div>
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="w-2 h-2 rounded-full bg-[#e8d5b5] animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-2 h-2 rounded-full bg-[#34d399] animate-bounce" style={{ animationDelay: "300ms" }} />
+                <span className="text-[11px] text-slate-300 font-light ml-2">
+                  {loadingStage === 1 && "Geocoding authentic local spots..."}
+                  {loadingStage === 2 && "Calibrating circadian flow..."}
+                  {loadingStage === 3 && "Finalizing notes & budget telemetry..."}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Responsive Multi-Turn Natural Language Input Bar */}
+        <form onSubmit={handleChatSubmit} className="relative z-10 pt-1">
           <div className="relative flex items-center">
             <div className="absolute left-4 flex items-center gap-2 text-slate-400">
-              <span title="Natural Voice Prompt">
+              <span title="Natural Voice Concierge Prompt">
                 <Mic className="w-4 h-4 text-[#e8d5b5] hover:text-white transition-colors cursor-pointer" />
               </span>
               <div className="w-[1px] h-4 bg-white/20 hidden sm:block" />
@@ -446,7 +568,7 @@ function AIPlannerContent() {
 
             <input
               type="text"
-              placeholder='e.g., "Plan a 4-day trip to Kolhapur exploring Mahalakshmi temple, Panhala fort & spicy Kolhapuri thali" or "Make day 2 more budget-friendly"...'
+              placeholder='Chat naturally: "Adjust day 2 with less walking for parents", "Add a traditional Kolhapuri mutton thali dinner", "Make it under $100/day"...'
               value={conversationalInput}
               onChange={(e) => setConversationalInput(e.target.value)}
               disabled={loading}
@@ -461,34 +583,34 @@ function AIPlannerContent() {
               {loading ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-[#050a10]" />
-                  <span className="hidden sm:inline">Curating...</span>
+                  <span className="hidden sm:inline">Mutating...</span>
                 </>
               ) : (
                 <>
                   <Send className="w-3.5 h-3.5 text-[#050a10]" />
-                  <span>Curate Flow</span>
+                  <span>Send</span>
                 </>
               )}
             </button>
           </div>
         </form>
 
-        {/* Quick-Prompt Suggestion Pills */}
-        <div className="space-y-2 relative z-10 pt-1">
+        {/* Quick-Prompt Interactive Suggestion Chips */}
+        <div className="space-y-1.5 relative z-10 pt-1">
           <div className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium flex items-center gap-1.5">
             <Lightbulb className="w-3 h-3 text-[#38bdf8]" />
-            <span>Instant Curations</span>
+            <span>Multi-Turn Prompts (Click to mutate live)</span>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_PROMPT_PILLS.map((pill, idx) => (
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_PROMPT_CHIPS.map((chip, idx) => (
               <button
                 key={idx}
                 type="button"
-                onClick={() => handlePillClick(pill)}
+                onClick={() => handleChipClick(chip)}
                 disabled={loading}
-                className="text-xs glass-pill px-3.5 py-1.5 rounded-full text-slate-300 hover:text-white hover:border-[#e8d5b5]/50 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
+                className="text-xs glass-pill px-3 py-1.5 rounded-full text-slate-300 hover:text-white hover:border-[#e8d5b5]/50 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
               >
-                <span>{pill.label}</span>
+                <span>{chip.label}</span>
               </button>
             ))}
           </div>
@@ -499,26 +621,26 @@ function AIPlannerContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Fine-Tuning Controls (5 Cols) */}
         <div className="lg:col-span-5 space-y-6">
-          <form onSubmit={handleFormSynthesize} className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 shadow-2xl">
+          <form onSubmit={handleFormSubmit} className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-2 text-xs font-semibold text-white uppercase tracking-wider">
                 <Sliders className="w-4 h-4 text-[#38bdf8]" />
                 <span>Expedition Parameters</span>
               </div>
-              <span className="text-[10px] text-[#e8d5b5] font-mono">Custom Flow</span>
+              <span className="text-[10px] text-[#e8d5b5] font-mono">Bespoke Flow</span>
             </div>
 
-            {/* 1. Target City or Sanctuary Input */}
+            {/* Target Location */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1 flex items-center justify-between">
                 <span>Target City, Town or Village</span>
-                <span className="text-slate-400 font-light">Worldwide</span>
+                <span className="text-slate-400 font-light">Universal</span>
               </label>
               <div className="relative">
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                 <input
                   type="text"
-                  placeholder="e.g. Kolhapur, Zermatt, Kyoto, Santorini"
+                  placeholder="e.g. Kolhapur, Zermatt, Amalfi Coast, Kyoto"
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   className="glass-input w-full pl-10 pr-4 py-3 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
@@ -541,7 +663,7 @@ function AIPlannerContent() {
               </div>
             </div>
 
-            {/* 2. Duration Stepper */}
+            {/* Duration Slider */}
             <div className="space-y-2">
               <div className="flex items-center justify-between pl-1">
                 <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium">
@@ -568,7 +690,7 @@ function AIPlannerContent() {
               </div>
             </div>
 
-            {/* 3. Circadian Pace */}
+            {/* Circadian Pace */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
                 Circadian Pace & Energy
@@ -591,7 +713,7 @@ function AIPlannerContent() {
               </div>
             </div>
 
-            {/* 4. Curatorial Lens */}
+            {/* Curatorial Lens */}
             <div className="space-y-2">
               <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium pl-1">
                 Curatorial Lens
@@ -637,6 +759,18 @@ function AIPlannerContent() {
               )}
             </button>
           </form>
+
+          {/* Live Chart.js Budget Telemetry Doughnut Chart */}
+          {itinerary && (
+            <BudgetDoughnutChart
+              costBreakdown={itinerary.costBreakdown}
+              dailyCost={convertAmount(itinerary.dailyCost)}
+              budgetMin={convertAmount(itinerary.budgetMin)}
+              budgetMax={convertAmount(itinerary.budgetMax)}
+              currency={currency}
+              currencySymbol={activeCurrencyConfig.symbol}
+            />
+          )}
         </div>
 
         {/* Right Column: Synthesized Editorial Itinerary or Multi-Stage Skeleton (7 Cols) */}
@@ -652,7 +786,7 @@ function AIPlannerContent() {
                       <Sparkles className="w-3.5 h-3.5 animate-spin text-[#38bdf8]" />
                     </div>
                     <span className="text-xs font-semibold text-white tracking-wide">
-                      Synthesizing Bespoke Itinerary
+                      Mutating Circadian Blueprint
                     </span>
                   </div>
                   <span className="text-xs font-mono font-bold text-[#e8d5b5]">
@@ -670,7 +804,6 @@ function AIPlannerContent() {
 
                 {/* 3-Stage Progress Descriptions */}
                 <div className="space-y-2.5 pt-2">
-                  {/* Stage 1 */}
                   <div
                     className={`flex items-center gap-3 text-xs p-2.5 rounded-xl transition-all ${
                       loadingStage >= 1
@@ -683,7 +816,6 @@ function AIPlannerContent() {
                     <span className="font-light">📍 Geocoding authentic local spots & walking corridors...</span>
                   </div>
 
-                  {/* Stage 2 */}
                   <div
                     className={`flex items-center gap-3 text-xs p-2.5 rounded-xl transition-all ${
                       loadingStage >= 2
@@ -696,7 +828,6 @@ function AIPlannerContent() {
                     <span className="font-light">🌙 Calibrating circadian flow from dawn light to twilight...</span>
                   </div>
 
-                  {/* Stage 3 */}
                   <div
                     className={`flex items-center gap-3 text-xs p-2.5 rounded-xl transition-all ${
                       loadingStage >= 3
@@ -706,12 +837,12 @@ function AIPlannerContent() {
                   >
                     <span className={`w-2 h-2 rounded-full ${loadingStage >= 3 ? "bg-[#34d399] shadow-[0_0_8px_#34d399]" : "bg-slate-600"}`} />
                     <span className="font-medium">Stage 3 (75–100%):</span>
-                    <span className="font-light">✨ Finalizing insider concierge notes & cost telemetry...</span>
+                    <span className="font-light">✨ Finalizing concierge notes & live cost telemetry...</span>
                   </div>
                 </div>
               </div>
 
-              {/* Shimmering Skeleton Cards */}
+              {/* Shimmering Skeleton Wireframe */}
               <div className="glass-shell rounded-3xl p-6 sm:p-8 border border-white/10 space-y-6">
                 <div className="h-6 w-3/4 shimmer-skeleton rounded-xl" />
                 <div className="h-4 w-1/2 shimmer-skeleton rounded-lg" />
@@ -730,20 +861,7 @@ function AIPlannerContent() {
           ) : itinerary ? (
             /* ─── 4. SYNTHESIZED RESULTS PRESENTATION ──────────────────────── */
             <div className="space-y-6 animate-reveal">
-              {/* A. Editorial Concierge Narrative Box (chatReply) */}
-              {itinerary.chatReply && (
-                <div className="glass-card p-5 sm:p-6 rounded-3xl border border-white/20 border-l-4 border-l-[#e8d5b5] shadow-xl relative overflow-hidden space-y-2">
-                  <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest text-[#e8d5b5] font-semibold">
-                    <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
-                    <span>Concierge Synthesis Note</span>
-                  </div>
-                  <p className="font-editorial text-sm sm:text-base text-slate-100 italic leading-relaxed">
-                    "{itinerary.chatReply}"
-                  </p>
-                </div>
-              )}
-
-              {/* B. Header Showcase Card */}
+              {/* Header Showcase Card */}
               <div className="glass-shell rounded-3xl p-6 sm:p-8 border border-white/15 shadow-2xl relative overflow-hidden space-y-6">
                 <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-[#38bdf8]/10 via-[#e8d5b5]/5 to-transparent blur-3xl pointer-events-none" />
 
@@ -802,14 +920,14 @@ function AIPlannerContent() {
                   </div>
 
                   <div className="glass-card p-3 rounded-2xl">
-                    <div className="text-[10px] uppercase text-slate-400 tracking-wider">Est. Daily Flow</div>
-                    <div className="text-xs font-semibold text-[#38bdf8] mt-1">
-                      ${itinerary.dailyCost} / day
+                    <div className="text-[10px] uppercase text-slate-400 tracking-wider">Est. Daily Cadence</div>
+                    <div className="text-xs font-semibold text-[#38bdf8] mt-1 font-mono">
+                      {activeCurrencyConfig.symbol}{convertAmount(itinerary.dailyCost)} / day
                     </div>
                   </div>
                 </div>
 
-                {/* Highlights Chips */}
+                {/* Curated Highlights Chips */}
                 <div className="space-y-2 pt-2">
                   <div className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium">
                     Curated Highlights
@@ -823,25 +941,9 @@ function AIPlannerContent() {
                     ))}
                   </div>
                 </div>
-
-                {/* Luxury Cost Breakdown Telemetry Bar */}
-                <div className="space-y-2 pt-2">
-                  <div className="flex items-center justify-between text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium">
-                    <span>Budget Telemetry Ratio</span>
-                    <span className="text-slate-400">
-                      Stays ({itinerary.costBreakdown[0]}%) • Dining ({itinerary.costBreakdown[1]}%) • Access ({itinerary.costBreakdown[2]}%) • Transit ({itinerary.costBreakdown[3]}%)
-                    </span>
-                  </div>
-                  <div className="h-2 rounded-full overflow-hidden flex bg-white/10">
-                    <div style={{ width: `${itinerary.costBreakdown[0]}%` }} className="bg-[#e8d5b5]" title="Boutique Stays" />
-                    <div style={{ width: `${itinerary.costBreakdown[1]}%` }} className="bg-[#38bdf8]" title="Gastronomy" />
-                    <div style={{ width: `${itinerary.costBreakdown[2]}%` }} className="bg-[#34d399]" title="Private Access" />
-                    <div style={{ width: `${itinerary.costBreakdown[3]}%` }} className="bg-slate-400" title="Transit" />
-                  </div>
-                </div>
               </div>
 
-              {/* C. Day Selector Tabs */}
+              {/* Day Selector Tabs */}
               <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
                 {itinerary.days.map((d) => (
                   <button
@@ -858,7 +960,7 @@ function AIPlannerContent() {
                 ))}
               </div>
 
-              {/* D. Selected Day Circadian Timeline */}
+              {/* Selected Day Circadian Timeline */}
               {itinerary.days
                 .filter((d) => d.day === selectedDay)
                 .map((dayPlan) => (
@@ -915,7 +1017,7 @@ function AIPlannerContent() {
                   </div>
                 ))}
 
-              {/* E. Concierge Departure Prep Checklist */}
+              {/* Concierge Departure Prep Checklist */}
               <div className="glass-shell p-6 rounded-3xl border border-white/10 space-y-3">
                 <div className="flex items-center gap-2 text-xs text-[#e8d5b5] font-semibold uppercase tracking-wider">
                   <ShieldCheck className="w-4 h-4 text-[#38bdf8]" />
@@ -930,55 +1032,6 @@ function AIPlannerContent() {
                   ))}
                 </div>
               </div>
-
-              {/* F. Inline Refinement Box */}
-              <div className="glass-dock p-5 sm:p-6 rounded-3xl border border-white/15 space-y-3 shadow-2xl">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[#f1f5f9]">
-                    <MessageSquare className="w-4 h-4 text-[#38bdf8]" />
-                    <span>Follow-Up Refinement</span>
-                  </div>
-                  <span className="text-[10px] text-slate-400">Context Preserved</span>
-                </div>
-
-                <div className="flex flex-wrap gap-1.5 pb-1">
-                  {[
-                    "Make day 2 more budget-friendly",
-                    "Add authentic vegetarian food spots",
-                    "Focus on scenic sunrise viewpoints",
-                  ].map((preset, i) => (
-                    <button
-                      key={i}
-                      onClick={() =>
-                        executeSynthesis({
-                          promptQuery: preset,
-                          isFollowUp: true,
-                        })
-                      }
-                      className="text-[10px] glass-pill px-2.5 py-1 rounded-full text-slate-300 hover:text-white transition-colors cursor-pointer"
-                    >
-                      + {preset}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <input
-                    placeholder="e.g., 'Replace afternoon transit with a walking tour'..."
-                    value={conversationalInput}
-                    onChange={(e) => setConversationalInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleChatSubmit()}
-                    className="glass-input flex-1 px-4 py-2.5 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
-                  />
-                  <button
-                    onClick={() => handleChatSubmit()}
-                    disabled={loading || !conversationalInput.trim()}
-                    className="btn-luxe px-4 py-2.5 rounded-2xl text-xs font-semibold cursor-pointer"
-                  >
-                    <Send className="w-4 h-4 text-[#050a10]" />
-                  </button>
-                </div>
-              </div>
             </div>
           ) : (
             /* ─── 5. EMPTY INVITATION STATE ───────────────────────────────── */
@@ -991,14 +1044,14 @@ function AIPlannerContent() {
                   Awaiting Your Sanctuary Coordinates
                 </h3>
                 <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                  Enter any global location into the Conversational AI Box above or pick a curated expedition to synthesize your bespoke blueprint.
+                  Enter any global location into the Conversational Chat Studio above or click a prompt chip to synthesize your bespoke blueprint.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
                 <button
                   onClick={() =>
-                    handlePillClick(QUICK_PROMPT_PILLS[0])
+                    handleChipClick(QUICK_PROMPT_CHIPS[0])
                   }
                   className="btn-luxe px-6 py-3 rounded-full text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
                 >
@@ -1008,11 +1061,11 @@ function AIPlannerContent() {
 
                 <button
                   onClick={() =>
-                    handlePillClick(QUICK_PROMPT_PILLS[2])
+                    handleChipClick(QUICK_PROMPT_CHIPS[4])
                   }
                   className="glass-pill px-6 py-3 rounded-full text-xs font-medium text-slate-200 hover:text-white inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Curate Kyoto Preview</span>
+                  <span>Curate Amalfi Preview</span>
                 </button>
               </div>
             </div>
