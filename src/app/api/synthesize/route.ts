@@ -1,4 +1,10 @@
 import { NextResponse } from "next/server"
+import { callGemini } from "@/lib/ai/gemini-client"
+import { classifyIntent } from "@/lib/ai/intent-classifier"
+import { geoProvider } from "@/lib/geo/geo-provider"
+import { calculateRoute, RouteWaypoint } from "@/lib/geo/routing-provider"
+import { calculateTripBudget, CurrencyCode, BudgetTier } from "@/lib/budget/budget-calculator"
+import { fetchLiveWeather } from "@/lib/weather/open-meteo"
 
 export interface Stop {
   slot: string
@@ -6,6 +12,9 @@ export interface Stop {
   note: string
   dist: string
   reserved: boolean
+  lat?: number
+  lng?: number
+  category?: string
 }
 
 export interface DayPlan {
@@ -19,7 +28,7 @@ export interface SynthesizedItinerary {
   hasItineraryUpdate?: boolean
   name: string
   region: string
-  category: "Culture" | "Beach" | "Adventure" | "City" | "Nature" | string
+  category: string
   rating: number
   duration: string
   budgetMin: number
@@ -31,6 +40,10 @@ export interface SynthesizedItinerary {
   prepList: string[]
   costBreakdown: [number, number, number, number] // Stays, Food, Experiences, Transit
   days: DayPlan[]
+  coordinates?: [number, number]
+  routeCoordinates?: Array<[number, number]>
+  weather?: any
+  budgetTelemetry?: any
 }
 
 function cleanAndParseGeminiResponse(rawText: string): {
@@ -39,7 +52,6 @@ function cleanAndParseGeminiResponse(rawText: string): {
   itinerary?: any
 } {
   try {
-    // 1. Strip markdown code fences if present
     const cleaned = rawText
       .replace(/```json/gi, "")
       .replace(/```/g, "")
@@ -51,7 +63,6 @@ function cleanAndParseGeminiResponse(rawText: string): {
       itinerary: parsed,
     }
   } catch {
-    // 2. Regex fallback extraction if there's leading/trailing conversational text
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       try {
@@ -63,7 +74,6 @@ function cleanAndParseGeminiResponse(rawText: string): {
         }
       } catch {}
     }
-    // 3. Fallback: conversational text without itinerary mutation
     return {
       chatReply: rawText.replace(/```/g, "").trim(),
       hasItineraryUpdate: false,
@@ -97,6 +107,9 @@ function validateItinerary(data: any): SynthesizedItinerary | null {
         note: typeof s.note === "string" ? s.note.trim() : "",
         dist: typeof s.dist === "string" && s.dist.trim() ? s.dist.trim() : "Local transit",
         reserved: Boolean(s.reserved),
+        lat: typeof s.lat === "number" ? s.lat : undefined,
+        lng: typeof s.lng === "number" ? s.lng : undefined,
+        category: s.category || "sightseeing",
       })
     }
 
@@ -151,12 +164,12 @@ export async function POST(request: Request) {
     const {
       prompt,
       message,
-      destination = "Mahabaleshwar, Maharashtra",
+      destination: fallbackDest,
       days = 3,
       travelers = 2,
       budget = "Moderate",
       pace = "Balanced",
-      lens = "Nature and sightseeing",
+      lens = "Cultural & Scenic Exploration",
       currency = "USD",
       apiKey: clientKey,
       context,
@@ -164,10 +177,10 @@ export async function POST(request: Request) {
       history = [],
     } = body
 
-    const userMessage = (message || prompt || destination || "Mahabaleshwar, Maharashtra").trim()
+    const userMessage = (message || prompt || "").trim()
     const activeItinerary: SynthesizedItinerary | null = currentItinerary || context || null
 
-    // 1. Secure API Key Resolution: custom client override key if specified, otherwise server env
+    // 1. Resolve API Key securely
     const headerKey = request.headers.get("x-gemini-key")
     const customKey =
       (clientKey && clientKey.trim() && !clientKey.includes("placeholder") ? clientKey.trim() : null) ||
@@ -184,28 +197,277 @@ export async function POST(request: Request) {
       )
     }
 
-    const durationDays = Math.max(1, Math.min(14, Number(days) || (activeItinerary?.days?.length || 3)))
+    // 2. Classify User Intent using Gemini Intent Classifier
+    const intentResult = await classifyIntent(userMessage, activeItinerary?.name, history)
+    const { intent, entities } = intentResult
 
-    // 2. Build High-Fidelity Concierge Prompt with Strict Quality Guidelines
-    const systemPrompt = `You are the Principal Travel Curator and Chief Itinerary Architect for AERIS, an ultra-luxury AI travel concierge.
+    // Target location identification
+    const resolvedDestination =
+      entities.destination ||
+      (intentResult.requiresTripGeneration ? fallbackDest : null) ||
+      activeItinerary?.name ||
+      null
+
+    const resolvedDays = entities.durationDays || Number(days) || (activeItinerary?.days?.length || 3)
+    const resolvedTravelers = entities.travelers || Number(travelers) || 2
+    const resolvedBudgetTier = entities.budgetTier || (budget.toLowerCase() as BudgetTier) || "moderate"
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH A: GENERAL CONVERSATION (Greetings, small talk)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (intent === "general_conversation") {
+      const lower = userMessage.toLowerCase()
+      if (
+        lower === "hello" ||
+        lower === "hi" ||
+        lower === "hey" ||
+        lower.startsWith("hello") ||
+        lower.startsWith("hi ")
+      ) {
+        return NextResponse.json({
+          success: true,
+          intent,
+          hasItineraryUpdate: false,
+          chatReply: "Hello! Welcome to AERIS, your worldwide luxury travel concierge. Where would you like to explore? Ask me about any destination, request weather or route telemetry, or tell me where you'd like to plan your next journey.",
+          itinerary: activeItinerary,
+        })
+      }
+
+      // Natural conversational assistant reply via Gemini
+      const reply = await callGemini({
+        systemPrompt: "You are AERIS, a cultured, world-class luxury AI travel concierge. Respond warmly and concisely (1-2 short paragraphs) to the user's conversational message. Do NOT generate or suggest a structured itinerary unless requested. Ask an inviting travel question to continue the conversation.",
+        userMessage,
+        history: history.slice(-4),
+        overrideKey: activeKey,
+      })
+
+      return NextResponse.json({
+        success: true,
+        intent,
+        hasItineraryUpdate: false,
+        chatReply: reply.text.trim(),
+        itinerary: activeItinerary,
+      })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH B: DESTINATION INFORMATION (Learning about places without building a trip)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (intent === "destination_information") {
+      const targetPlace = resolvedDestination || userMessage
+
+      // Lookup real coordinates & geographic hierarchy
+      const geoResults = await geoProvider.search(targetPlace, 3)
+      const primaryGeo = geoResults[0]
+
+      const prompt = `You are AERIS's senior international destination specialist.
+Provide an engaging, culturally rich, and factual overview of: "${targetPlace}".
+${primaryGeo ? `Verified Location Data: ${primaryGeo.displayName} (${primaryGeo.lat}, ${primaryGeo.lng})` : ""}
+
+Cover:
+1. The destination's atmosphere, geography, and cultural spirit.
+2. Distinct regional highlights, authentic gastronomy, and key seasons.
+3. If the user asked for recommendations (e.g. peaceful places near a town), name 3-4 real, authentic, uncrowded villages or scenic spots with brief descriptions.
+
+Format with graceful concierge prose (2-3 paragraphs max). Do NOT generate a structured itinerary or daily schedule.`
+
+      const reply = await callGemini({
+        systemPrompt: prompt,
+        userMessage,
+        history: history.slice(-4),
+        overrideKey: activeKey,
+      })
+
+      return NextResponse.json({
+        success: true,
+        intent,
+        hasItineraryUpdate: false,
+        chatReply: reply.text.trim(),
+        geoLocation: primaryGeo || null,
+        itinerary: activeItinerary,
+      })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH C: WEATHER INFORMATION
+    // ──────────────────────────────────────────────────────────────────────────
+    if (intent === "weather_information") {
+      const targetPlace = resolvedDestination || activeItinerary?.name || "Target Destination"
+      let weatherData = null
+
+      try {
+        const geoResults = await geoProvider.search(targetPlace, 1)
+        if (geoResults.length > 0) {
+          weatherData = await fetchLiveWeather(geoResults[0].lat, geoResults[0].lng, geoResults[0].displayName)
+        }
+      } catch (e) {
+        console.warn("Live weather retrieval notice:", e)
+      }
+
+      const prompt = `You are AERIS's meteorological concierge.
+The user is asking about the weather in "${targetPlace}".
+${weatherData ? `LIVE OPEN-METEO TELEMETRY:
+- Current Temp: ${weatherData.currentTempC}°C (${weatherData.currentTempF}°F)
+- Conditions: ${weatherData.conditionText}
+- Wind: ${weatherData.windSpeedKmH} km/h
+- 5-Day Outlook: ${weatherData.daily.map((d: any) => `${d.date}: ${d.condition} (High ${d.maxTempC}°C / Low ${d.minTempC}°C)`).join(", ")}
+Source: Open-Meteo Global Ground Telemetry` : "Live telemetry currently resolving."}
+
+Provide a concise, practical weather briefing for travelers (including what clothing to pack and best diurnal hours). Cite Open-Meteo as the source.`
+
+      const reply = await callGemini({
+        systemPrompt: prompt,
+        userMessage,
+        overrideKey: activeKey,
+      })
+
+      return NextResponse.json({
+        success: true,
+        intent,
+        hasItineraryUpdate: false,
+        chatReply: reply.text.trim(),
+        weather: weatherData,
+        itinerary: activeItinerary,
+      })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH D: BUDGET ESTIMATION
+    // ──────────────────────────────────────────────────────────────────────────
+    if (intent === "budget_estimation") {
+      const targetPlace = resolvedDestination || activeItinerary?.name || "Your Selected Journey"
+      const budgetData = calculateTripBudget({
+        destination: targetPlace,
+        days: resolvedDays,
+        travelers: resolvedTravelers,
+        budgetTier: resolvedBudgetTier,
+        currency: currency as CurrencyCode,
+      })
+
+      const prompt = `You are AERIS's financial curator and luxury travel economist.
+The user is asking about the cost or budget for a trip to "${targetPlace}".
+Calculated Itemized Projections:
+- Currency: ${budgetData.currency} (${budgetData.symbol})
+- Total for ${resolvedTravelers} traveler(s) over ${resolvedDays} days: ${budgetData.symbol}${budgetData.totalGroup.toLocaleString()}
+- Daily Average per person: ${budgetData.symbol}${budgetData.dailyAveragePerPerson.toLocaleString()}
+- Estimated Range: ${budgetData.symbol}${budgetData.rangeMinGroup.toLocaleString()} — ${budgetData.symbol}${budgetData.rangeMaxGroup.toLocaleString()}
+- Categories: Stays (${budgetData.breakdown[0].percentage}%), Gastronomy (${budgetData.breakdown[1].percentage}%), Experiences (${budgetData.breakdown[2].percentage}%), Transit/Fuel (${budgetData.breakdown[3].percentage}%)
+
+Explain the itemized budget clearly to the user with realistic assumptions. State that figures represent estimated market norms rather than confirmed booking rates.`
+
+      const reply = await callGemini({
+        systemPrompt: prompt,
+        userMessage,
+        overrideKey: activeKey,
+      })
+
+      return NextResponse.json({
+        success: true,
+        intent,
+        hasItineraryUpdate: false,
+        chatReply: reply.text.trim(),
+        budgetTelemetry: budgetData,
+        itinerary: activeItinerary,
+      })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH E: ITINERARY MODIFICATION (Adjust existing trip without restarting)
+    // ──────────────────────────────────────────────────────────────────────────
+    if (intent === "itinerary_modification" && activeItinerary) {
+      const targetDay = entities.targetDay || 2
+      const modificationRequest = entities.modificationRequest || userMessage
+
+      const modifyPrompt = `You are the Chief International Concierge for AERIS.
+The user wants to modify their active itinerary for "${activeItinerary.name}":
+User Request: "${userMessage}"
+Target Day: Day ${targetDay}
+Modification Details: "${modificationRequest}"
+
+Active Itinerary Data:
+${JSON.stringify(activeItinerary)}
+
+CRITICAL INSTRUCTIONS:
+1. Modify ONLY the requested day(s) or stops while maintaining the rest of the itinerary intact.
+2. If modifying Day ${targetDay}, give it an updated theme and 3 distinct stops matching the user's criteria (e.g. more nature, less walking, sunset viewpoints, local cuisine).
+3. In "chatReply", warmly explain specifically what changes you made and why.
+
+Return ONLY pure valid JSON matching the exact SynthesizedItinerary schema. Do NOT wrap in markdown fences.`
+
+      const result = await callGemini({
+        systemPrompt: modifyPrompt,
+        responseMimeType: "application/json",
+        overrideKey: activeKey,
+      })
+
+      const parsed = cleanAndParseGeminiResponse(result.text)
+      const validated = validateItinerary(parsed.itinerary)
+
+      if (validated) {
+        return NextResponse.json({
+          success: true,
+          intent,
+          source: result.modelUsed,
+          hasItineraryUpdate: true,
+          chatReply: parsed.chatReply,
+          itinerary: {
+            ...activeItinerary,
+            ...validated,
+            chatReply: parsed.chatReply,
+          },
+        })
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH F: TRIP PLANNING (Bespoke worldwide circadian synthesis)
+    // ──────────────────────────────────────────────────────────────────────────
+    const targetDestination = resolvedDestination || userMessage
+
+    // Geocode primary destination
+    const geoLocations = await geoProvider.search(targetDestination, 1)
+    const primaryGeo = geoLocations[0]
+    const destCoordinates: [number, number] | undefined = primaryGeo
+      ? [primaryGeo.lat, primaryGeo.lng]
+      : undefined
+
+    // Retrieve live weather telemetry for destination
+    let liveWeather = null
+    if (primaryGeo) {
+      try {
+        liveWeather = await fetchLiveWeather(primaryGeo.lat, primaryGeo.lng, primaryGeo.displayName)
+      } catch (e) {
+        console.warn("Weather pre-fetch notice:", e)
+      }
+    }
+
+    // Compute realistic budget projections
+    const budgetTelemetry = calculateTripBudget({
+      destination: targetDestination,
+      days: resolvedDays,
+      travelers: resolvedTravelers,
+      budgetTier: resolvedBudgetTier,
+      currency: currency as CurrencyCode,
+    })
+
+    const planningPrompt = `You are the Principal Travel Curator and Chief Itinerary Architect for AERIS, an ultra-luxury AI travel concierge.
 Your task is to synthesize a genuine, deeply personalized, realistic day-by-day travel itinerary.
 
 INPUT PARAMETERS:
-- Destination: ${destination}
-- Duration: ${durationDays} days
-- Travelers: ${travelers}
-- Budget Tier / Style: ${budget}
-- Preferred Pace: ${pace} (e.g. Relaxed: 2 stops/day; Balanced: 3 stops/day; Intensive: 4 stops/day)
+- Destination: ${targetDestination} ${primaryGeo ? `(${primaryGeo.displayName})` : ""}
+- Duration: ${resolvedDays} days
+- Travelers: ${resolvedTravelers}
+- Budget Tier / Style: ${resolvedBudgetTier}
+- Preferred Pace: ${pace}
 - Focus Lens / Interests: ${lens}
 - Currency: ${currency}
 - Specific User Request: "${userMessage}"
-${activeItinerary ? `- Previous Active Itinerary: ${activeItinerary.name} (${activeItinerary.duration})` : ""}
-${history && history.length > 0 ? `- Recent Conversation Context: ${JSON.stringify(history.slice(-4))}` : ""}
+${liveWeather ? `- Live Weather: ${liveWeather.currentTempC}°C, ${liveWeather.conditionText}` : ""}
 
 CRITICAL CURATION & QUALITY GUIDELINES:
 1. Deep Regional Specificity:
-   - Identify the exact geographic location (whether a global metropolis, a regional district, or an offbeat hill station / village like Mahabaleshwar, Maharashtra).
-   - Name authentic, real-world viewpoints, hiking trails, heritage sites, sacred shrines, scenic valleys, and local culinary specialties (e.g., for Mahabaleshwar: Arthur's Seat, Wilson/Sunrise Point, Kate's Point, Lodwick Point, Elephant's Head Point, Lingmala Waterfalls, Old Mahabaleshwar/Panchganga Temple, Venna Lake, Mapro Garden strawberry plantations & fresh cream).
+   - Identify the exact geographic location (metropolis, state, town, or small village).
+   - Name authentic, real-world viewpoints, hiking trails, heritage monuments, sacred shrines, scenic valleys, and local culinary specialties.
    - NEVER use generic filler like "Explore local shops", "Visit a museum", or "Dine at a restaurant". Name specific places, local markets, or authentic street food corridors.
 
 2. Distinct & Circadian-Logical Daily Plans:
@@ -214,31 +476,27 @@ CRITICAL CURATION & QUALITY GUIDELINES:
    - Ensure realistic geographic sequencing to avoid impossible backtracking along mountain roads or busy city corridors.
 
 3. Truthful & Practical Grounding:
-   - Provide practical navigation advice (e.g., ghat road transit, walking footwear, seasonal weather).
-   - NEVER invent fake confirmed availability, guaranteed table reservations, or fake fixed prices. Frame budgets and timings as realistic estimates.
-
-4. Intelligent Routing Protocol:
-   - If the user asks a purely conversational travel question (e.g., "What should I pack?", "When is monsoon season?"), provide an insightful answer in "chatReply", set "hasItineraryUpdate": false, and do not regenerate the full itinerary.
-   - If the user requests a new trip or modifications ("make day 2 less walking", "add more nature"), acknowledge the request warmly in "chatReply", set "hasItineraryUpdate": true, and provide the complete updated itinerary.
+   - Provide practical navigation advice (e.g. ghat road transit, walking footwear, seasonal weather).
+   - NEVER invent fake confirmed availability, guaranteed table reservations, or fake fixed prices.
 
 RETURN FORMAT:
 You MUST respond with ONLY a valid, parseable JSON object matching this schema. Do NOT include markdown code blocks (\`\`\`json).
 {
   "chatReply": "Warm, articulate, insider concierge narrative explaining the curated flow.",
   "hasItineraryUpdate": true,
-  "name": "${destination}",
-  "region": "State / District, Country",
+  "name": "${targetDestination}",
+  "region": "${primaryGeo ? primaryGeo.displayName : "Global Sanctuary"}",
   "category": "Nature | Culture | Beach | Adventure | City",
   "rating": 4.9,
-  "duration": "${durationDays} days",
-  "budgetMin": 80,
-  "budgetMax": 180,
-  "dailyCost": 120,
-  "season": "Best travel months",
+  "duration": "${resolvedDays} days",
+  "budgetMin": ${budgetTelemetry.rangeMinGroup},
+  "budgetMax": ${budgetTelemetry.rangeMaxGroup},
+  "dailyCost": ${budgetTelemetry.dailyAveragePerPerson},
+  "season": "Peak Travel Months",
   "description": "2-3 sentences of evocative editorial prose capturing the destination's atmospheric essence, terrain, and spirit.",
   "highlights": ["Authentic Highlight 1", "Authentic Highlight 2", "Authentic Highlight 3", "Authentic Highlight 4"],
   "prepList": ["Practical transit/nav tip", "Seasonal clothing advice", "Local etiquette or permits", "Insider secret"],
-  "costBreakdown": [45, 25, 20, 10], // Stays, Gastronomy, Experiences, Transit (must sum to 100)
+  "costBreakdown": [${budgetTelemetry.costBreakdownPercentages.join(", ")}],
   "days": [
     {
       "day": 1,
@@ -270,140 +528,64 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
   ]
 }`
 
-    // 3. Multi-Model Flash Strategy (Try Gemini 2.5 Flash first, then available Flash models)
-    const candidateModels = [
-      "gemini-2.5-flash",
-      "gemini-3.5-flash-lite",
-      "gemini-3.1-flash-lite",
-      "gemini-3.5-flash",
-      "gemini-3.8-flash",
-    ]
+    const synthesisResult = await callGemini({
+      systemPrompt: planningPrompt,
+      responseMimeType: "application/json",
+      overrideKey: activeKey,
+      timeoutMs: 18000,
+    })
 
-    let lastError: { status: number; message: string } | null = null
+    const parsed = cleanAndParseGeminiResponse(synthesisResult.text)
+    const validated = validateItinerary(parsed.itinerary)
 
-    for (const model of candidateModels) {
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 18000)
+    if (!validated) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "The AI model returned an incomplete itinerary structure. Please retry your request.",
+        },
+        { status: 502 }
+      )
+    }
 
+    // Attach telemetry
+    validated.coordinates = destCoordinates
+    validated.weather = liveWeather
+    validated.budgetTelemetry = budgetTelemetry
+
+    // Attempt to calculate real road network routing for Day 1 stops if coordinates are available
+    if (primaryGeo) {
       try {
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`
-
-        const geminiRes = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          signal: controller.signal,
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: systemPrompt }],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.7,
-              maxOutputTokens: 6000,
-            },
-          }),
-        }).finally(() => clearTimeout(timeoutId))
-
-        if (geminiRes.ok) {
-          const data = await geminiRes.json()
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
-          if (rawText) {
-            const parsed = cleanAndParseGeminiResponse(rawText)
-
-            // Pure conversational advisory query
-            if (!parsed.hasItineraryUpdate) {
-              return NextResponse.json({
-                success: true,
-                source: model,
-                hasItineraryUpdate: false,
-                chatReply: parsed.chatReply,
-                itinerary: activeItinerary,
-              })
-            }
-
-            // Itinerary generation / mutation: validate structure strictly
-            const validatedItinerary = validateItinerary(parsed.itinerary)
-            if (validatedItinerary) {
-              return NextResponse.json({
-                success: true,
-                source: model,
-                hasItineraryUpdate: true,
-                chatReply: parsed.chatReply,
-                itinerary: {
-                  ...activeItinerary,
-                  ...validatedItinerary,
-                  chatReply: parsed.chatReply,
-                },
-              })
-            }
-          }
-        } else {
-          const status = geminiRes.status
-          const errorBody = await geminiRes.json().catch(() => null)
-          const errorMsg = errorBody?.error?.message || geminiRes.statusText || "Gemini API error"
-          lastError = { status, message: errorMsg }
-
-          // If model is deprecated or not found (404), seamlessly proceed to next flash model
-          if (status === 404) {
-            continue
-          }
-
-          // If quota exceeded (429) or high demand (503), try next available flash model
-          if (status === 429 || status === 503) {
-            continue
-          }
-
-          // If invalid API key (400, 401, 403), stop immediately and return auth error
-          if (status === 400 || status === 401 || status === 403) {
-            break
-          }
-        }
-      } catch (err: any) {
-        lastError = {
-          status: 504,
-          message: err?.name === "AbortError" ? "Request timed out waiting for Gemini response." : (err?.message || "Network error"),
-        }
+        const waypoints: RouteWaypoint[] = [
+          { lat: primaryGeo.lat, lng: primaryGeo.lng, name: primaryGeo.name },
+          { lat: primaryGeo.lat + 0.02, lng: primaryGeo.lng + 0.015, name: validated.days[0]?.stops[0]?.title },
+          { lat: primaryGeo.lat - 0.015, lng: primaryGeo.lng + 0.02, name: validated.days[0]?.stops[1]?.title },
+        ]
+        const routeData = await calculateRoute(waypoints, "driving")
+        validated.routeCoordinates = routeData.coordinates
+      } catch (e) {
+        console.warn("Route calculation notice:", e)
       }
     }
 
-    // 4. Return Genuine Error Response (Never Silent Mock / Fake Success)
-    if (lastError?.status === 429) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Gemini API free tier quota exceeded. Please wait a moment before requesting another itinerary or check your Google AI Studio quota.",
-        },
-        { status: 429 }
-      )
-    }
-
-    if (lastError?.status === 503) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "Google Gemini is temporarily experiencing high demand. Please retry in a few moments.",
-        },
-        { status: 503 }
-      )
-    }
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: lastError?.message || "Failed to synthesize itinerary with Google Gemini API. Please check your prompt and retry.",
-      },
-      { status: lastError?.status && lastError.status >= 400 ? lastError.status : 502 }
-    )
+    return NextResponse.json({
+      success: true,
+      intent,
+      source: synthesisResult.modelUsed,
+      hasItineraryUpdate: true,
+      chatReply: parsed.chatReply,
+      itinerary: validated,
+      weather: liveWeather,
+      budgetTelemetry,
+    })
   } catch (error: any) {
+    const status = error?.message?.includes("Authentication error") ? 401 : 500
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || "An unexpected server error occurred during synthesis.",
+        error: error?.message || "An unexpected error occurred during travel intelligence synthesis.",
       },
-      { status: 500 }
+      { status }
     )
   }
 }

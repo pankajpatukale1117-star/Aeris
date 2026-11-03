@@ -16,6 +16,7 @@ interface TripMapProps {
   points?: MapPoint[]
   center?: [number, number]
   zoom?: number
+  routeCoordinates?: Array<[number, number]>
   className?: string
 }
 
@@ -35,13 +36,14 @@ const DynamicLeafletMap = dynamic(
 
 export function TripMap({
   points = [],
-  center = [35.0116, 135.7681], // default Kyoto
+  center = [35.0116, 135.7681],
   zoom = 12,
+  routeCoordinates,
   className = "h-[360px] sm:h-[420px] w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl",
 }: TripMapProps) {
   return (
     <div className={`relative ${className}`}>
-      <DynamicLeafletMap points={points} center={center} zoom={zoom} />
+      <DynamicLeafletMap points={points} center={center} zoom={zoom} routeCoordinates={routeCoordinates} />
     </div>
   )
 }

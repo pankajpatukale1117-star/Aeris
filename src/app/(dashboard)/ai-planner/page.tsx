@@ -34,6 +34,8 @@ import {
   User,
   Bot,
   RotateCcw,
+  CloudSun,
+  Wind,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
@@ -41,6 +43,7 @@ import { useGeminiStore } from "@/lib/gemini-store"
 import { DESTINATIONS } from "@/lib/constants"
 import { SynthesizedItinerary } from "@/app/api/synthesize/route"
 import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
+import { TripMap, MapPoint } from "@/components/map/trip-map"
 
 type CurrencyCode = "USD" | "INR" | "EUR" | "JPY"
 
@@ -65,9 +68,9 @@ const PACE_MODES = [
 ]
 
 const QUICK_SANCTUARIES = [
-  "Kolhapur, India",
   "Kyoto, Japan",
   "Zermatt, Switzerland",
+  "Sedona, USA",
   "Amalfi Coast, Italy",
   "Santorini, Greece",
   "Hallstatt, Austria",
@@ -75,25 +78,10 @@ const QUICK_SANCTUARIES = [
 
 const QUICK_PROMPT_CHIPS = [
   {
-    label: "📍 4 Days in Kolhapur & Panhala fort",
-    query: "Plan 4 days in Kolhapur exploring historic temples, Panhala fort, and authentic food",
-    dest: "Kolhapur, Maharashtra, India",
+    label: "🏔️ 4 Days Alpine Retreat in Zermatt",
+    query: "Plan a 4-day alpine retreat in Zermatt exploring Matterhorn viewpoints and scenic mountain trains",
+    dest: "Zermatt, Switzerland",
     days: 4,
-  },
-  {
-    label: "🚶 Adjust day 2 with less walking for parents",
-    query: "Actually, my parents can't walk long distances, adjust day 2 with less walking",
-    isModification: true,
-  },
-  {
-    label: "🍲 Add traditional Kolhapuri mutton thali dinner",
-    query: "Add a traditional Kolhapuri mutton thali spot for dinner",
-    isModification: true,
-  },
-  {
-    label: "💵 Make the whole trip budget-friendly under $100/day",
-    query: "Can we make the whole trip budget-friendly under $100 a day?",
-    isModification: true,
   },
   {
     label: "🍋 5 Days in Amalfi & Capri with private boat",
@@ -106,6 +94,16 @@ const QUICK_PROMPT_CHIPS = [
     query: "Plan a slow-paced 4-day Zen retreat in Kyoto exploring secluded bamboo groves and tea ceremonies",
     dest: "Kyoto, Japan",
     days: 4,
+  },
+  {
+    label: "🚶 Adjust day 2 with less walking for family",
+    query: "Adjust day 2 with less walking and more relaxed viewpoints",
+    isModification: true,
+  },
+  {
+    label: "💵 Make the whole trip budget-friendly",
+    query: "Can you rebalance the budget to be more cost-effective?",
+    isModification: true,
   },
 ]
 
@@ -126,8 +124,8 @@ function AIPlannerContent() {
 
   const prefillDestination = searchParams.get("destination") || ""
 
-  // Core Expedition Form Controls
-  const [destination, setDestination] = React.useState(prefillDestination || "Kolhapur, Maharashtra")
+  // Core Expedition Form Controls (Clean, universal default)
+  const [destination, setDestination] = React.useState(prefillDestination || "")
   const [days, setDays] = React.useState(3)
   const [pace, setPace] = React.useState("Balanced")
   const [lens, setLens] = React.useState("Architectural & Cultural Gems")
@@ -142,7 +140,7 @@ function AIPlannerContent() {
     {
       id: "welcome-1",
       role: "ai",
-      text: "Greetings. I am AERIS's Multi-Turn Concierge Engine. Request any expedition on Earth in natural prose, or ask me to modify an existing itinerary on the fly (e.g. reduce walking for family, add authentic dining, or adjust daily budgets).",
+      text: "Greetings. I am AERIS's worldwide travel intelligence assistant. Ask me about any destination on Earth, inquire about weather, routes, or budgets, or request a bespoke circadian expedition plan.",
       timestamp: "Just now",
       timestampMs: Date.now(),
     },
@@ -152,6 +150,27 @@ function AIPlannerContent() {
   const [itinerary, setItinerary] = React.useState<SynthesizedItinerary | null>(null)
   const [selectedDay, setSelectedDay] = React.useState(1)
   const [sourceModel, setSourceModel] = React.useState<string>("")
+
+  // Dynamic Map Points calculated from geocoded itinerary stops
+  const mapPoints: MapPoint[] = React.useMemo(() => {
+    if (!itinerary) return []
+    const points: MapPoint[] = []
+    const baseLat = itinerary.coordinates?.[0] || 35.0116
+    const baseLng = itinerary.coordinates?.[1] || 135.7681
+
+    itinerary.days.forEach((day) => {
+      day.stops.forEach((stop, sIdx) => {
+        points.push({
+          id: `stop-${day.day}-${sIdx}`,
+          title: `Day ${day.day}: ${stop.title}`,
+          lat: stop.lat || baseLat + ((sIdx + 1) * 0.012 * (sIdx % 2 === 0 ? 1 : -1)),
+          lng: stop.lng || baseLng + ((sIdx + 1) * 0.012 * (day.day % 2 === 0 ? 1 : -1)),
+          category: stop.category || "sightseeing",
+        })
+      })
+    })
+    return points
+  }, [itinerary])
 
   // Ultra-Smooth Multi-Stage Loading Transitions State
   const [loading, setLoading] = React.useState(false)
@@ -711,7 +730,7 @@ function AIPlannerContent() {
                 <MapPin className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
                 <input
                   type="text"
-                  placeholder="e.g. Kolhapur, Zermatt, Amalfi Coast, Kyoto"
+                  placeholder="e.g. Kyoto, Zermatt, Mahabaleshwar, Amalfi, Sedona..."
                   value={destination}
                   onChange={(e) => setDestination(e.target.value)}
                   className="glass-input w-full pl-10 pr-4 py-3 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
@@ -1012,6 +1031,86 @@ function AIPlannerContent() {
                     ))}
                   </div>
                 </div>
+
+                {/* Live Atmospheric Telemetry (Open-Meteo Integration) */}
+                {itinerary.weather && (
+                  <div className="glass-card p-4 rounded-2xl border border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-[#38bdf8]/10 via-transparent to-[#e8d5b5]/5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl glass-pill flex items-center justify-center text-[#38bdf8] shadow-[0_0_15px_rgba(56,189,248,0.2)]">
+                        <CloudSun className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className="text-[10px] uppercase tracking-wider text-[#e8d5b5] font-semibold">Live Atmospheric Telemetry</div>
+                        <div className="text-sm font-semibold text-white">
+                          {itinerary.weather.currentTempC}°C ({itinerary.weather.currentTempF}°F) • {itinerary.weather.conditionText}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-slate-300">
+                      <span className="flex items-center gap-1 font-mono text-slate-400">
+                        <Wind className="w-3.5 h-3.5 text-[#38bdf8]" />
+                        {itinerary.weather.windSpeedKmH} km/h
+                      </span>
+                      <span className="glass-pill px-2.5 py-1 text-[10px] font-semibold text-emerald-400 border-emerald-500/30">
+                        Open-Meteo Live Ground
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Real Route & Map Intelligence (OSRM & Leaflet) */}
+                <div className="space-y-2 pt-2">
+                  <div className="flex items-center justify-between">
+                    <div className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-semibold flex items-center gap-1.5">
+                      <Navigation className="w-3.5 h-3.5 text-[#38bdf8]" />
+                      <span>Geographical Route Telemetry</span>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {mapPoints.length} Waypoint Sanctuaries
+                    </span>
+                  </div>
+                  <TripMap
+                    points={mapPoints}
+                    center={itinerary.coordinates || (mapPoints.length > 0 ? [mapPoints[0].lat, mapPoints[0].lng] : [20, 73])}
+                    zoom={12}
+                    routeCoordinates={itinerary.routeCoordinates}
+                    className="h-[280px] sm:h-[340px] w-full rounded-2xl overflow-hidden border border-white/10 shadow-2xl"
+                  />
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
+                    <span>OSRM Road Network Calculations</span>
+                    <span>CartoDB Dark Matter / OSM Tile Layer</span>
+                  </div>
+                </div>
+
+                {/* Realistic Budget Engine Projections */}
+                {itinerary.budgetTelemetry && (
+                  <div className="glass-shell p-5 rounded-2xl border border-white/10 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-semibold flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 text-[#38bdf8]" />
+                        <span>Itemized Cost Projections ({itinerary.budgetTelemetry.currency})</span>
+                      </div>
+                      <span className="text-xs font-mono font-semibold text-[#38bdf8]">
+                        Total: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.totalGroup.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
+                      {itinerary.budgetTelemetry.breakdown.map((b: any, bIdx: number) => (
+                        <div key={bIdx} className="glass-card p-2.5 rounded-xl space-y-1">
+                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">{b.category}</div>
+                          <div className="font-semibold text-white font-mono">
+                            {itinerary.budgetTelemetry.symbol}{b.totalGroup.toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-slate-400 line-clamp-1">{b.assumptions}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex items-center justify-between">
+                      <span>Daily: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.dailyAveragePerPerson}/day/person</span>
+                      <span>Range: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.rangeMinGroup.toLocaleString()} — {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.rangeMaxGroup.toLocaleString()}</span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Day Selector Tabs */}
@@ -1127,16 +1226,16 @@ function AIPlannerContent() {
                   className="btn-luxe px-6 py-3 rounded-full text-xs font-semibold inline-flex items-center gap-2 cursor-pointer"
                 >
                   <Sparkles className="w-4 h-4 text-[#050a10]" />
-                  <span>Curate Kolhapur Preview</span>
+                  <span>Curate Zermatt Preview</span>
                 </button>
 
                 <button
                   onClick={() =>
-                    handleChipClick(QUICK_PROMPT_CHIPS[4])
+                    handleChipClick(QUICK_PROMPT_CHIPS[2])
                   }
                   className="glass-pill px-6 py-3 rounded-full text-xs font-medium text-slate-200 hover:text-white inline-flex items-center gap-2 cursor-pointer"
                 >
-                  <span>Curate Amalfi Preview</span>
+                  <span>Curate Kyoto Preview</span>
                 </button>
               </div>
             </div>
