@@ -24,7 +24,7 @@ export async function POST(request: Request) {
       try {
         const ai = new GoogleGenAI({ apiKey })
 
-        const prompt = `You are the lead travel architect for ROVEO, a luxury travel-tech product.
+        const prompt = `You are the lead travel architect for AERIS, a luxury travel-tech product.
 Generate a structured, highly realistic travel itinerary based on:
 - Origin: ${origin}
 - Destination: ${destination}
@@ -93,7 +93,7 @@ DO NOT include markdown code fences (\`\`\`json). Return ONLY valid raw JSON.`
       }
     }
 
-    // High-fidelity curated fallback matching ROVEO's standards
+    // High-fidelity curated fallback matching AERIS's standards
     const mockItinerary = {
       title: `${pace.charAt(0).toUpperCase() + pace.slice(1)} Discovery in ${destination}`,
       destination: destination,
@@ -223,7 +223,7 @@ DO NOT include markdown code fences (\`\`\`json). Return ONLY valid raw JSON.`
       success: true,
       itinerary: mockItinerary,
       source: "demo-engine",
-      note: "Generated with ROVEO Curated Engine. Add GEMINI_API_KEY to .env.local for live LLM synthesis.",
+      note: "Generated with AERIS Curated Engine. Add GEMINI_API_KEY to .env.local for live LLM synthesis.",
     })
   } catch (err: any) {
     return NextResponse.json(

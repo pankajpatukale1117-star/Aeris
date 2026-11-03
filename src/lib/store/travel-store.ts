@@ -312,7 +312,7 @@ const INITIAL_SAVED_DESTINATION_IDS = [
 
 const DEFAULT_USER: UserSession = {
   id: "user-alexandra-1",
-  email: "alexandra.vance@roveo.travel",
+  email: "alexandra.vance@aeris.travel",
   fullName: "Alexandra Vance",
   avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80",
   tier: "Passport Concierge",
@@ -541,7 +541,7 @@ export const useTravelStore = create<TravelStoreState>()(
       },
     }),
     {
-      name: "roveo_travel_store_v1",
+      name: "aeris_travel_store_v1",
       storage: createJSONStorage(() => localStorage),
     }
   )

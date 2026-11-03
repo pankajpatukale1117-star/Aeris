@@ -29,7 +29,7 @@ export function GeminiKeyModal() {
       removeApiKey()
       toast({
         title: "Key Cleared",
-        description: "Switched to ROVEO Curated Offline Demo Mode.",
+        description: "Switched to AERIS Curated Offline Demo Mode.",
       })
       closeModal()
       return
@@ -83,7 +83,7 @@ export function GeminiKeyModal() {
     setInputKey("")
     toast({
       title: "Key Removed",
-      description: "ROVEO will use our curated global sanctuary library.",
+      description: "AERIS will use our curated global sanctuary library.",
     })
   }
 

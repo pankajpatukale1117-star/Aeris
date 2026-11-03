@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     // 2. If valid Gemini API key present, execute live multi-turn call
     if (activeKey && !activeKey.includes("placeholder") && activeKey.length > 15) {
       try {
-        const systemPrompt = `You are ROVEO's elite international travel concierge AI. You chat naturally, warmly, and intelligently like Google Gemini, while generating and dynamically revising circadian travel itineraries for ANY city, region, state, country, or small village on Earth.
+        const systemPrompt = `You are AERIS's elite international travel concierge AI. You chat naturally, warmly, and intelligently like Google Gemini, while generating and dynamically revising circadian travel itineraries for ANY city, region, state, country, or small village on Earth.
 
 Input Context:
 - Current Itinerary in State: ${activeItinerary ? JSON.stringify(activeItinerary).slice(0, 1500) : "None (New Plan)"}

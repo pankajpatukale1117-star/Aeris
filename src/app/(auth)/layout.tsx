@@ -16,7 +16,7 @@ export default function AuthLayout({
       <header className="p-6 sm:p-8 flex justify-between items-center relative z-10 max-w-6xl mx-auto w-full">
         <Link href="/" className="flex items-center gap-2.5 group">
           <span className="font-editorial text-2xl font-bold tracking-wider text-[#e8d5b5]">
-            ROVEO
+            AERIS
           </span>
           <span className="w-1.5 h-1.5 rounded-full bg-[#38bdf8] shadow-[0_0_8px_#38bdf8]" />
         </Link>
@@ -35,7 +35,7 @@ export default function AuthLayout({
 
       {/* Footer */}
       <footer className="p-6 text-center text-xs text-slate-500 relative z-10">
-        © {new Date().getFullYear()} ROVEO International Concierge. High-fidelity cryptographic session security.
+        © {new Date().getFullYear()} AERIS International Concierge. High-fidelity cryptographic session security.
       </footer>
     </div>
   )

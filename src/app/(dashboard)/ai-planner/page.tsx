@@ -138,7 +138,7 @@ function AIPlannerContent() {
     {
       id: "welcome-1",
       role: "ai",
-      text: "Greetings. I am ROVEO's Multi-Turn Concierge Engine. Request any expedition on Earth in natural prose, or ask me to modify an existing itinerary on the fly (e.g. reduce walking for family, add authentic dining, or adjust daily budgets).",
+      text: "Greetings. I am AERIS's Multi-Turn Concierge Engine. Request any expedition on Earth in natural prose, or ask me to modify an existing itinerary on the fly (e.g. reduce walking for family, add authentic dining, or adjust daily budgets).",
       timestamp: "Just now",
     },
   ])
@@ -291,7 +291,7 @@ function AIPlannerContent() {
       console.warn("Client synthesis notice:", err)
       toast({
         title: "Synthesis Notice",
-        description: "Engaging ROVEO High-Fidelity Universal Curated Engine.",
+        description: "Engaging AERIS High-Fidelity Universal Curated Engine.",
       })
     } finally {
       setLoading(false)
@@ -397,7 +397,7 @@ function AIPlannerContent() {
   // Copy Itinerary Text
   const handleCopyItinerary = () => {
     if (!itinerary) return
-    const textSummary = `ROVEO Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${activeCurrencyConfig.symbol}${convertAmount(itinerary.dailyCost)} / day\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
+    const textSummary = `AERIS Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${activeCurrencyConfig.symbol}${convertAmount(itinerary.dailyCost)} / day\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
     navigator.clipboard.writeText(textSummary)
     toast({
       title: "Copied to Clipboard",
@@ -417,7 +417,7 @@ function AIPlannerContent() {
             Multi-Turn Gemini Travel Concierge
           </div>
           <h1 className="font-editorial text-3xl sm:text-5xl font-medium tracking-tight text-[#f1f5f9]">
-            ROVEO <span className="italic text-[#e8d5b5]">Concierge Studio</span>
+            AERIS <span className="italic text-[#e8d5b5]">Concierge Studio</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-light">
             Your journey, your way. Chat naturally to generate or adapt live itineraries for any village, town, or metropolis on Earth.
@@ -523,7 +523,7 @@ function AIPlannerContent() {
                   ) : (
                     <>
                       <Bot className="w-3 h-3 text-[#e8d5b5]" />
-                      <span className="text-[#e8d5b5]">ROVEO Concierge</span>
+                      <span className="text-[#e8d5b5]">AERIS Concierge</span>
                     </>
                   )}
                 </div>

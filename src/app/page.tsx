@@ -65,7 +65,7 @@ export default function HomePage() {
           {/* Micro Brand Tag */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full glass-pill text-white/90 text-[11px] uppercase tracking-[0.22em] font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#e8d5b5] shadow-[0_0_8px_#e8d5b5]" />
-            <span>ROVEO Travel Architecture</span>
+            <span>AERIS Travel Architecture</span>
             <span className="text-white/40">•</span>
             <span className="text-[#e8d5b5]">Bespoke Journeys</span>
           </div>
@@ -296,7 +296,7 @@ export default function HomePage() {
               AI planning that values nuance over noise.
             </h2>
             <p className="text-sm sm:text-base text-[#94a3b8] leading-relaxed">
-              We reject chaotic chatbot dumps. ROVEO’s AI engine was trained with the instincts of seasoned international concierges—balancing geographic proximity, natural circadian pace, and local secrets.
+              We reject chaotic chatbot dumps. AERIS’s AI engine was trained with the instincts of seasoned international concierges—balancing geographic proximity, natural circadian pace, and local secrets.
             </p>
 
             <ul className="space-y-3.5 text-xs sm:text-sm text-[#f1f5f9]/90 pt-1">
@@ -332,7 +332,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]" />
                   <span className="text-[11px] uppercase font-bold tracking-widest text-[#e8d5b5]">
-                    ROVEO AI Concierge Desk
+                    AERIS AI Concierge Desk
                   </span>
                 </div>
                 <span className="text-[10px] text-white/50 font-mono">v2.5 Synced</span>
@@ -458,7 +458,7 @@ export default function HomePage() {
             Featured Journeys
           </h2>
           <p className="text-sm text-[#94a3b8]">
-            Explore complete blueprints planned by ROVEO architects. Use as inspiration or customize for your dates.
+            Explore complete blueprints planned by AERIS architects. Use as inspiration or customize for your dates.
           </p>
         </div>
 

@@ -5,7 +5,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet"
 import L from "leaflet"
 import { MapPoint } from "./trip-map"
 
-// Custom SVG-based Pin Icon matching ROVEO's Liquid Glass cyan & champagne palette
+// Custom SVG-based Pin Icon matching AERIS's Liquid Glass cyan & champagne palette
 const customIcon = L.divIcon({
   className: "custom-leaflet-marker",
   html: `<div style="background: #38bdf8; width: 26px; height: 26px; border-radius: 50%; border: 3px solid #050a10; box-shadow: 0 0 16px rgba(56, 189, 248, 0.8); display: flex; align-items: center; justify-content: center; transition: transform 0.2s ease;">

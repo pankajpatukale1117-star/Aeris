@@ -168,7 +168,7 @@ export default function LoginPage() {
             </div>
           ) : (
             <div className="flex items-center gap-2">
-              <span>Sign In to ROVEO</span>
+              <span>Sign In to AERIS</span>
               <ArrowRight className="w-4 h-4" />
             </div>
           )}
@@ -176,7 +176,7 @@ export default function LoginPage() {
       </form>
 
       <div className="pt-4 border-t border-white/10 text-center text-xs text-slate-400 relative z-10">
-        New to ROVEO?{" "}
+        New to AERIS?{" "}
         <Link href="/signup" className="text-[#38bdf8] font-semibold hover:text-[#e8d5b5] transition-colors">
           Request membership access
         </Link>

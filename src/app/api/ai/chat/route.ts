@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       try {
         const ai = new GoogleGenAI({ apiKey })
 
-        const prompt = `You are ROVEO's senior travel assistant.
+        const prompt = `You are AERIS's senior travel assistant.
 The user is currently reviewing this trip: "${currentItinerary?.title || "Custom Itinerary"}" in "${currentItinerary?.destination || "the destination"}".
 User question/modification request: "${message}"
 

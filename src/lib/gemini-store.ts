@@ -22,8 +22,10 @@ export const useGeminiStore = create<GeminiState>((set, get) => ({
     const trimmed = key.trim()
     if (typeof window !== "undefined") {
       if (trimmed) {
+        localStorage.setItem("aeris_gemini_key", trimmed)
         localStorage.setItem("roveo_gemini_key", trimmed)
       } else {
+        localStorage.removeItem("aeris_gemini_key")
         localStorage.removeItem("roveo_gemini_key")
       }
     }
@@ -35,6 +37,7 @@ export const useGeminiStore = create<GeminiState>((set, get) => ({
 
   removeApiKey: () => {
     if (typeof window !== "undefined") {
+      localStorage.removeItem("aeris_gemini_key")
       localStorage.removeItem("roveo_gemini_key")
     }
     set({ apiKey: "", hasKey: false })
@@ -42,7 +45,10 @@ export const useGeminiStore = create<GeminiState>((set, get) => ({
 
   initialize: () => {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("roveo_gemini_key") || ""
+      const stored =
+        localStorage.getItem("aeris_gemini_key") ||
+        localStorage.getItem("roveo_gemini_key") ||
+        ""
       const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
       const activeKey = stored || envKey
       set({ apiKey: activeKey, hasKey: Boolean(activeKey) })

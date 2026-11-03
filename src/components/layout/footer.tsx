@@ -11,7 +11,7 @@ export function Footer() {
           <div className="md:col-span-5 space-y-5">
             <Link href="/" className="flex items-center gap-2 group">
               <span className="font-editorial text-3xl font-bold tracking-tight text-[#f1f5f9] group-hover:text-[#e8d5b5] transition-colors">
-                ROVEO
+                AERIS
               </span>
               <span className="w-2 h-2 rounded-full bg-[#e8d5b5] shadow-[0_0_8px_rgba(232,213,181,0.8)]" />
             </Link>
@@ -21,7 +21,7 @@ export function Footer() {
             </p>
 
             <p className="text-xs text-[#94a3b8] max-w-sm leading-relaxed">
-              ROVEO is an art-directed luxury travel technology house designed for discerning travelers who value intention, architectural beauty, and bespoke discovery across the globe.
+              AERIS is an art-directed luxury travel technology house designed for discerning travelers who value intention, architectural beauty, and bespoke discovery across the globe.
             </p>
 
             <div className="pt-2 flex items-center gap-3">
@@ -125,7 +125,7 @@ export function Footer() {
 
         {/* Bottom Colophon Row */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#94a3b8]/70">
-          <p>© {new Date().getFullYear()} ROVEO Architecture Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} AERIS Travel Architecture Ltd. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="hover:text-[#f1f5f9] cursor-pointer">Privacy Charter</span>
             <span className="hover:text-[#f1f5f9] cursor-pointer">Terms of Service</span>
