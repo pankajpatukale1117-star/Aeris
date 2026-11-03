@@ -43,15 +43,31 @@ export const useGeminiStore = create<GeminiState>((set, get) => ({
     set({ apiKey: "", hasKey: false })
   },
 
-  initialize: () => {
+  initialize: async () => {
     if (typeof window !== "undefined") {
       const stored =
         localStorage.getItem("aeris_gemini_key") ||
         localStorage.getItem("roveo_gemini_key") ||
         ""
-      const envKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || ""
-      const activeKey = stored || envKey
-      set({ apiKey: activeKey, hasKey: Boolean(activeKey) })
+      if (stored) {
+        set({ apiKey: stored, hasKey: true })
+        return
+      }
+
+      // Check if server environment has GEMINI_API_KEY configured securely
+      try {
+        const res = await fetch("/api/gemini/status")
+        if (res.ok) {
+          const data = await res.json()
+          if (data.configured) {
+            set({ hasKey: true })
+            return
+          }
+        }
+      } catch {
+        // network or offline
+      }
+      set({ apiKey: "", hasKey: false })
     }
   },
 }))

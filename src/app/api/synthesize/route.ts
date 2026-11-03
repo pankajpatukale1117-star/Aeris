@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server"
 
-interface Stop {
+export interface Stop {
   slot: string
   title: string
   note: string
@@ -8,7 +8,7 @@ interface Stop {
   reserved: boolean
 }
 
-interface DayPlan {
+export interface DayPlan {
   day: number
   theme: string
   stops: Stop[]
@@ -19,7 +19,7 @@ export interface SynthesizedItinerary {
   hasItineraryUpdate?: boolean
   name: string
   region: string
-  category: "Culture" | "Beach" | "Adventure" | "City"
+  category: "Culture" | "Beach" | "Adventure" | "City" | "Nature" | string
   rating: number
   duration: string
   budgetMin: number
@@ -29,17 +29,17 @@ export interface SynthesizedItinerary {
   description: string
   highlights: string[]
   prepList: string[]
-  costBreakdown: [number, number, number, number] // Boutique Stays, Gastronomy, Experiences/Access, Transit
+  costBreakdown: [number, number, number, number] // Stays, Food, Experiences, Transit
   days: DayPlan[]
 }
 
 function cleanAndParseGeminiResponse(rawText: string): {
   chatReply: string
   hasItineraryUpdate: boolean
-  itinerary?: Partial<SynthesizedItinerary>
+  itinerary?: any
 } {
   try {
-    // 1. Strip markdown fences if present
+    // 1. Strip markdown code fences if present
     const cleaned = rawText
       .replace(/```json/gi, "")
       .replace(/```/g, "")
@@ -50,7 +50,7 @@ function cleanAndParseGeminiResponse(rawText: string): {
       hasItineraryUpdate: parsed.hasItineraryUpdate !== false && Boolean(parsed.days || parsed.name),
       itinerary: parsed,
     }
-  } catch (err) {
+  } catch {
     // 2. Regex fallback extraction if there's leading/trailing conversational text
     const jsonMatch = rawText.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
@@ -61,13 +61,87 @@ function cleanAndParseGeminiResponse(rawText: string): {
           hasItineraryUpdate: parsed.hasItineraryUpdate !== false && Boolean(parsed.days || parsed.name),
           itinerary: parsed,
         }
-      } catch (e) {}
+      } catch {}
     }
-    // 3. Fallback: return natural text with no itinerary crash
+    // 3. Fallback: conversational text without itinerary mutation
     return {
       chatReply: rawText.replace(/```/g, "").trim(),
       hasItineraryUpdate: false,
     }
+  }
+}
+
+function validateItinerary(data: any): SynthesizedItinerary | null {
+  if (!data || typeof data !== "object") return null
+  const name = typeof data.name === "string" && data.name.trim() ? data.name.trim() : ""
+  if (!name) return null
+
+  if (!Array.isArray(data.days) || data.days.length === 0) return null
+
+  const validatedDays: DayPlan[] = []
+  for (let i = 0; i < data.days.length; i++) {
+    const d = data.days[i]
+    if (!d || typeof d !== "object") return null
+    const dayNum = Number(d.day) || i + 1
+    const theme = typeof d.theme === "string" && d.theme.trim() ? d.theme.trim() : `Day ${dayNum} Exploration`
+    if (!Array.isArray(d.stops) || d.stops.length === 0) return null
+
+    const validatedStops: Stop[] = []
+    for (const s of d.stops) {
+      if (!s || typeof s !== "object") continue
+      const title = typeof s.title === "string" ? s.title.trim() : ""
+      if (!title) continue
+      validatedStops.push({
+        slot: typeof s.slot === "string" && s.slot.trim() ? s.slot.trim() : "Daytime",
+        title,
+        note: typeof s.note === "string" ? s.note.trim() : "",
+        dist: typeof s.dist === "string" && s.dist.trim() ? s.dist.trim() : "Local transit",
+        reserved: Boolean(s.reserved),
+      })
+    }
+
+    if (validatedStops.length === 0) return null
+    validatedDays.push({
+      day: dayNum,
+      theme,
+      stops: validatedStops,
+    })
+  }
+
+  const costBreakdown: [number, number, number, number] =
+    Array.isArray(data.costBreakdown) && data.costBreakdown.length === 4
+      ? [
+          Number(data.costBreakdown[0]) || 45,
+          Number(data.costBreakdown[1]) || 25,
+          Number(data.costBreakdown[2]) || 20,
+          Number(data.costBreakdown[3]) || 10,
+        ]
+      : [45, 25, 20, 10]
+
+  return {
+    name,
+    region: typeof data.region === "string" ? data.region.trim() : "Global Sanctuary",
+    category: typeof data.category === "string" ? data.category.trim() : "Nature & Culture",
+    rating: Number(data.rating) || 4.9,
+    duration: typeof data.duration === "string" ? data.duration.trim() : `${validatedDays.length} days`,
+    budgetMin: Number(data.budgetMin) || 80,
+    budgetMax: Number(data.budgetMax) || 200,
+    dailyCost: Number(data.dailyCost) || 120,
+    season: typeof data.season === "string" ? data.season.trim() : "Peak Travel Season",
+    description:
+      typeof data.description === "string" && data.description.trim()
+        ? data.description.trim()
+        : `An art-directed circadian journey across ${name}.`,
+    highlights:
+      Array.isArray(data.highlights) && data.highlights.length > 0
+        ? data.highlights.map(String)
+        : [`Scenic viewpoints of ${name}`],
+    prepList:
+      Array.isArray(data.prepList) && data.prepList.length > 0
+        ? data.prepList.map(String)
+        : ["Pack comfortable walking shoes", "Check local weather before transit"],
+    costBreakdown,
+    days: validatedDays,
   }
 }
 
@@ -77,10 +151,12 @@ export async function POST(request: Request) {
     const {
       prompt,
       message,
-      destination = "Kolhapur, Maharashtra",
+      destination = "Mahabaleshwar, Maharashtra",
       days = 3,
+      travelers = 2,
+      budget = "Moderate",
       pace = "Balanced",
-      lens = "Architectural & Cultural Gems",
+      lens = "Nature and sightseeing",
       currency = "USD",
       apiKey: clientKey,
       context,
@@ -88,78 +164,129 @@ export async function POST(request: Request) {
       history = [],
     } = body
 
-    const userMessage = (message || prompt || destination || "Kolhapur, Maharashtra").trim()
+    const userMessage = (message || prompt || destination || "Mahabaleshwar, Maharashtra").trim()
     const activeItinerary: SynthesizedItinerary | null = currentItinerary || context || null
 
-    // 1. Resolve API Key from Environment, Header, or Client Body
+    // 1. Secure API Key Resolution: custom client override key if specified, otherwise server env
     const headerKey = request.headers.get("x-gemini-key")
-    const activeKey =
-      process.env.GEMINI_API_KEY ||
-      clientKey ||
-      headerKey ||
-      process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
-      ""
+    const customKey =
+      (clientKey && clientKey.trim() && !clientKey.includes("placeholder") ? clientKey.trim() : null) ||
+      (headerKey && headerKey.trim() && !headerKey.includes("placeholder") ? headerKey.trim() : null)
+    const activeKey = customKey || process.env.GEMINI_API_KEY || ""
+
+    if (!activeKey) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Gemini API key is not configured. Please set GEMINI_API_KEY in your server environment (.env.local).",
+        },
+        { status: 401 }
+      )
+    }
 
     const durationDays = Math.max(1, Math.min(14, Number(days) || (activeItinerary?.days?.length || 3)))
 
-    // 2. If valid Gemini API key present, execute live call with strict 3s timeout
-    if (activeKey && !activeKey.includes("placeholder") && activeKey.length > 15) {
-      try {
-        const systemPrompt = `You are the Chief International Concierge at AERIS, an art-directed luxury travel technology house.
-You speak like a seasoned, hyper-knowledgeable human local insider—warm, decisive, cultured, and zero corporate filler.
+    // 2. Build High-Fidelity Concierge Prompt with Strict Quality Guidelines
+    const systemPrompt = `You are the Principal Travel Curator and Chief Itinerary Architect for AERIS, an ultra-luxury AI travel concierge.
+Your task is to synthesize a genuine, deeply personalized, realistic day-by-day travel itinerary.
 
-CRITICAL BEHAVIORS:
-1. Deep Regional Specificity: NEVER speak in vague generalities.
-   - If planning Kolhapur, mention Panhala Fort's mist, New Palace's black basalt Indo-Saracenic stone architecture, Rankala Lake sunset walks, Mahalakshmi Temple early morning kakad aarti, and authentic Kolhapuri cuisine (Tambda and Pandhra Rassa at Opal/Dehati, historic Kolhapuri Misal at Phadtare in Udyamnagar or Bawada, and local jaggery/chappal artisans in Shivaji Market).
-   - If planning Kyoto, Amalfi, Zermatt, Hallstatt, or any small village on Earth, name exact streets, specific viewpoints, local seasonal harvests, and authentic family-run ateliers.
-2. Intelligent Query Routing:
-   - If the user asks a normal travel question (e.g., "what should I pack?", "is it safe?", "when is the best season?"), give a brilliant, concise, conversational answer. Set "hasItineraryUpdate": false.
-   - If the user asks to build or modify a trip, answer warmly in "chatReply", tailor the requested changes, and set "hasItineraryUpdate": true with the full structured itinerary.
-3. Dynamic Mutation Awareness:
-   - When the user asks for changes ("my parents can't walk much", "make it cheaper", "add more sunset cafes"), acknowledge the exact reason in your chat reply, swap out the problematic stops, and keep the good ones intact.
-
-Current Context:
-- Active Trip: ${activeItinerary ? `${activeItinerary.name} (${activeItinerary.duration})` : "None"}
-- User Query: "${userMessage}"
+INPUT PARAMETERS:
+- Destination: ${destination}
+- Duration: ${durationDays} days
+- Travelers: ${travelers}
+- Budget Tier / Style: ${budget}
+- Preferred Pace: ${pace} (e.g. Relaxed: 2 stops/day; Balanced: 3 stops/day; Intensive: 4 stops/day)
+- Focus Lens / Interests: ${lens}
 - Currency: ${currency}
-- Pace: ${pace}
-- Lens: ${lens}
+- Specific User Request: "${userMessage}"
+${activeItinerary ? `- Previous Active Itinerary: ${activeItinerary.name} (${activeItinerary.duration})` : ""}
+${history && history.length > 0 ? `- Recent Conversation Context: ${JSON.stringify(history.slice(-4))}` : ""}
 
-Return a strict JSON object with this exact schema:
+CRITICAL CURATION & QUALITY GUIDELINES:
+1. Deep Regional Specificity:
+   - Identify the exact geographic location (whether a global metropolis, a regional district, or an offbeat hill station / village like Mahabaleshwar, Maharashtra).
+   - Name authentic, real-world viewpoints, hiking trails, heritage sites, sacred shrines, scenic valleys, and local culinary specialties (e.g., for Mahabaleshwar: Arthur's Seat, Wilson/Sunrise Point, Kate's Point, Lodwick Point, Elephant's Head Point, Lingmala Waterfalls, Old Mahabaleshwar/Panchganga Temple, Venna Lake, Mapro Garden strawberry plantations & fresh cream).
+   - NEVER use generic filler like "Explore local shops", "Visit a museum", or "Dine at a restaurant". Name specific places, local markets, or authentic street food corridors.
+
+2. Distinct & Circadian-Logical Daily Plans:
+   - Each day must have a unique editorial theme and completely distinct activities from the other days.
+   - Organize activities chronologically: Morning (08:30–09:00), Afternoon (13:00–13:30), Twilight/Evening (17:30–19:00).
+   - Ensure realistic geographic sequencing to avoid impossible backtracking along mountain roads or busy city corridors.
+
+3. Truthful & Practical Grounding:
+   - Provide practical navigation advice (e.g., ghat road transit, walking footwear, seasonal weather).
+   - NEVER invent fake confirmed availability, guaranteed table reservations, or fake fixed prices. Frame budgets and timings as realistic estimates.
+
+4. Intelligent Routing Protocol:
+   - If the user asks a purely conversational travel question (e.g., "What should I pack?", "When is monsoon season?"), provide an insightful answer in "chatReply", set "hasItineraryUpdate": false, and do not regenerate the full itinerary.
+   - If the user requests a new trip or modifications ("make day 2 less walking", "add more nature"), acknowledge the request warmly in "chatReply", set "hasItineraryUpdate": true, and provide the complete updated itinerary.
+
+RETURN FORMAT:
+You MUST respond with ONLY a valid, parseable JSON object matching this schema. Do NOT include markdown code blocks (\`\`\`json).
 {
-  "chatReply": "Warm, articulate conversational concierge answer.",
+  "chatReply": "Warm, articulate, insider concierge narrative explaining the curated flow.",
   "hasItineraryUpdate": true,
-  "name": "Location Name (City/Town/Village)",
+  "name": "${destination}",
   "region": "State / District, Country",
-  "category": "Culture | Beach | Adventure | City",
+  "category": "Nature | Culture | Beach | Adventure | City",
   "rating": 4.9,
   "duration": "${durationDays} days",
   "budgetMin": 80,
-  "budgetMax": 200,
-  "dailyCost": 130,
-  "season": "Prime travel months",
-  "description": "Art-directed editorial prose capturing the location's character, history, and atmosphere.",
-  "highlights": ["Highlight 1", "Highlight 2", "Highlight 3", "Highlight 4"],
-  "prepList": ["Local permit or booking tip", "Transit or packing essential", "Cultural etiquette note", "Regional secret"],
-  "costBreakdown": [45, 30, 15, 10], // Stays, Food, Experiences, Transit (must sum to 100)
+  "budgetMax": 180,
+  "dailyCost": 120,
+  "season": "Best travel months",
+  "description": "2-3 sentences of evocative editorial prose capturing the destination's atmospheric essence, terrain, and spirit.",
+  "highlights": ["Authentic Highlight 1", "Authentic Highlight 2", "Authentic Highlight 3", "Authentic Highlight 4"],
+  "prepList": ["Practical transit/nav tip", "Seasonal clothing advice", "Local etiquette or permits", "Insider secret"],
+  "costBreakdown": [45, 25, 20, 10], // Stays, Gastronomy, Experiences, Transit (must sum to 100)
   "days": [
     {
       "day": 1,
       "theme": "Editorial theme for Day 1",
       "stops": [
-        { "slot": "Morning • 08:30", "title": "Exact local landmark, trail, or cafe", "note": "Insider concierge tip with circadian nuance", "dist": "10 min walk", "reserved": true },
-        { "slot": "Afternoon • 13:30", "title": "Artisanal culinary, historic, or scenic stop", "note": "Local specialty to try", "dist": "15 min transit", "reserved": false },
-        { "slot": "Twilight • 19:00", "title": "Sunset viewpoint, rooftop, or evening salon", "note": "Golden hour atmosphere tip", "dist": "8 min walk", "reserved": true }
+        {
+          "slot": "Morning • 08:30",
+          "title": "Exact Landmark or Trail Name",
+          "note": "Insider context, sunrise light tip, or cultural note",
+          "dist": "Transit / walk indicator",
+          "reserved": false
+        },
+        {
+          "slot": "Afternoon • 13:00",
+          "title": "Exact Dining or Heritage Stop",
+          "note": "Specific local culinary dish or architectural highlight",
+          "dist": "Transit / walk indicator",
+          "reserved": false
+        },
+        {
+          "slot": "Twilight • 17:30",
+          "title": "Sunset Viewpoint or Evening Stroll",
+          "note": "Golden hour perspective and dusk ambiance",
+          "dist": "Transit / walk indicator",
+          "reserved": false
+        }
       ]
     }
   ]
 }`
 
-        // AbortController to guarantee zero lag: max 2800ms
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 2800)
+    // 3. Multi-Model Flash Strategy (Try Gemini 2.5 Flash first, then available Flash models)
+    const candidateModels = [
+      "gemini-2.5-flash",
+      "gemini-3.5-flash-lite",
+      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash",
+      "gemini-3.8-flash",
+    ]
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(activeKey)}`
+    let lastError: { status: number; message: string } | null = null
+
+    for (const model of candidateModels) {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 18000)
+
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(activeKey)}`
 
         const geminiRes = await fetch(endpoint, {
           method: "POST",
@@ -175,7 +302,7 @@ Return a strict JSON object with this exact schema:
             generationConfig: {
               responseMimeType: "application/json",
               temperature: 0.7,
-              maxOutputTokens: 4000,
+              maxOutputTokens: 6000,
             },
           }),
         }).finally(() => clearTimeout(timeoutId))
@@ -185,545 +312,98 @@ Return a strict JSON object with this exact schema:
           const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
           if (rawText) {
             const parsed = cleanAndParseGeminiResponse(rawText)
-            if (parsed.hasItineraryUpdate && parsed.itinerary) {
+
+            // Pure conversational advisory query
+            if (!parsed.hasItineraryUpdate) {
               return NextResponse.json({
                 success: true,
-                source: "gemini-live",
-                hasItineraryUpdate: true,
-                chatReply: parsed.chatReply,
-                itinerary: {
-                  ...activeItinerary,
-                  ...parsed.itinerary,
-                  chatReply: parsed.chatReply,
-                },
-              })
-            } else if (!parsed.hasItineraryUpdate) {
-              return NextResponse.json({
-                success: true,
-                source: "gemini-live",
+                source: model,
                 hasItineraryUpdate: false,
                 chatReply: parsed.chatReply,
                 itinerary: activeItinerary,
               })
             }
+
+            // Itinerary generation / mutation: validate structure strictly
+            const validatedItinerary = validateItinerary(parsed.itinerary)
+            if (validatedItinerary) {
+              return NextResponse.json({
+                success: true,
+                source: model,
+                hasItineraryUpdate: true,
+                chatReply: parsed.chatReply,
+                itinerary: {
+                  ...activeItinerary,
+                  ...validatedItinerary,
+                  chatReply: parsed.chatReply,
+                },
+              })
+            }
+          }
+        } else {
+          const status = geminiRes.status
+          const errorBody = await geminiRes.json().catch(() => null)
+          const errorMsg = errorBody?.error?.message || geminiRes.statusText || "Gemini API error"
+          lastError = { status, message: errorMsg }
+
+          // If model is deprecated or not found (404), seamlessly proceed to next flash model
+          if (status === 404) {
+            continue
+          }
+
+          // If quota exceeded (429) or high demand (503), try next available flash model
+          if (status === 429 || status === 503) {
+            continue
+          }
+
+          // If invalid API key (400, 401, 403), stop immediately and return auth error
+          if (status === 400 || status === 401 || status === 403) {
+            break
           }
         }
-      } catch (geminiError: any) {
-        // Fast fallback on network abort, rate limits (429), or unavailable models (503)
+      } catch (err: any) {
+        lastError = {
+          status: 504,
+          message: err?.name === "AbortError" ? "Request timed out waiting for Gemini response." : (err?.message || "Network error"),
+        }
       }
     }
 
-    // 3. Hyper-Specific Universal Concierge Intelligence Engine
-    const result = generateDeeplySpecificConciergeOutput(
-      userMessage,
-      durationDays,
-      pace,
-      lens,
-      currency,
-      activeItinerary
-    )
+    // 4. Return Genuine Error Response (Never Silent Mock / Fake Success)
+    if (lastError?.status === 429) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Gemini API free tier quota exceeded. Please wait a moment before requesting another itinerary or check your Google AI Studio quota.",
+        },
+        { status: 429 }
+      )
+    }
 
-    return NextResponse.json({
-      success: true,
-      source: "aeris-intelligence-engine",
-      hasItineraryUpdate: result.hasItineraryUpdate,
-      chatReply: result.chatReply,
-      itinerary: result.itinerary,
-    })
-  } catch (error: any) {
-    console.error("Synthesize API Error:", error)
+    if (lastError?.status === 503) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Google Gemini is temporarily experiencing high demand. Please retry in a few moments.",
+        },
+        { status: 503 }
+      )
+    }
+
     return NextResponse.json(
       {
         success: false,
-        error: error?.message || "Failed to process concierge request.",
+        error: lastError?.message || "Failed to synthesize itinerary with Google Gemini API. Please check your prompt and retry.",
+      },
+      { status: lastError?.status && lastError.status >= 400 ? lastError.status : 502 }
+    )
+  } catch (error: any) {
+    return NextResponse.json(
+      {
+        success: false,
+        error: error?.message || "An unexpected server error occurred during synthesis.",
       },
       { status: 500 }
     )
-  }
-}
-
-function generateDeeplySpecificConciergeOutput(
-  input: string,
-  days: number,
-  pace: string,
-  lens: string,
-  currency: string = "USD",
-  activeItinerary: SynthesizedItinerary | null = null
-): {
-  chatReply: string
-  hasItineraryUpdate: boolean
-  itinerary: SynthesizedItinerary | null
-} {
-  const lower = input.toLowerCase()
-
-  // ── 1. INTELLIGENT QUERY ROUTING: Non-Itinerary Travel Questions ───────────
-  const isGeneralQuestion =
-    (lower.startsWith("what ") ||
-      lower.startsWith("how ") ||
-      lower.startsWith("why ") ||
-      lower.startsWith("is it ") ||
-      lower.startsWith("can i ") ||
-      lower.startsWith("when ") ||
-      lower.startsWith("tell me about") ||
-      lower.includes("weather") ||
-      lower.includes("packing") ||
-      lower.includes("what to pack") ||
-      lower.includes("dress code") ||
-      lower.includes("safety") ||
-      lower.includes("safe")) &&
-    !lower.includes("plan") &&
-    !lower.includes("create") &&
-    !lower.includes("adjust") &&
-    !lower.includes("modify") &&
-    !lower.includes("trip")
-
-  if (isGeneralQuestion) {
-    if (lower.includes("pack") || lower.includes("dress")) {
-      return {
-        hasItineraryUpdate: false,
-        itinerary: activeItinerary,
-        chatReply:
-          "For sacred sanctuaries and heritage forts, pack breathable natural linens and modest cottons that cover shoulders and knees. Slip-on leather loafers or footwear with easily removable clasps are essential, as shoes must be removed before entering ancient temple sanctums. For twilight walks along lakesides or hilltop ramparts (like Panhala), bring a light evening shawl to ward off the valley breeze.",
-      }
-    }
-
-    if (lower.includes("weather") || lower.includes("season") || lower.includes("best time")) {
-      return {
-        hasItineraryUpdate: false,
-        itinerary: activeItinerary,
-        chatReply:
-          "The most sublime window is late autumn through early spring (October to March). During these months, the daytime skies are crisp and temperate (22°C–28°C), mornings carry a fresh mist, and evenings are refreshingly cool. If you appreciate dramatic emerald landscapes, the late monsoon in September paints the surrounding hills in breathtaking verdant hues.",
-      }
-    }
-
-    if (lower.includes("safety") || lower.includes("safe")) {
-      return {
-        hasItineraryUpdate: false,
-        itinerary: activeItinerary,
-        chatReply:
-          "The region is exceptionally warm and welcoming toward travelers. Local hospitality is legendary—residents take immense pride in their heritage. Standard travel wisdom applies: keep modest cash for artisanal markets, download offline navigation for mountain fortress roads, and use verified local radio cabs or private chauffeured transfers for late-night airport corridors.",
-      }
-    }
-
-    return {
-      hasItineraryUpdate: false,
-      itinerary: activeItinerary,
-      chatReply: `Regarding your question on "${input}": As your concierge, I recommend prioritizing morning visits before 09:30 AM for undisturbed light, reserving private tastings directly through heritage estates, and always seeking out generational family-run eateries over commercial tourist plazas.`,
-    }
-  }
-
-  // ── 2. DYNAMIC MUTATION: Parents / Less Walking / Accessible ──────────────
-  if (
-    activeItinerary &&
-    (lower.includes("walking") ||
-      lower.includes("parents") ||
-      lower.includes("strenuous") ||
-      lower.includes("elderly") ||
-      lower.includes("accessible") ||
-      lower.includes("tired") ||
-      lower.includes("distance"))
-  ) {
-    const updatedDays = activeItinerary.days.map((day) => {
-      if (day.day === 2 || activeItinerary.days.length === 1) {
-        return {
-          ...day,
-          theme: "Low-Impact Panoramic Viewpoints & Private Chauffeur Corridors",
-          stops: [
-            {
-              slot: "Morning • 09:00",
-              title: `${activeItinerary.name} Panoramic Overlook via Private Vehicular Access`,
-              note: "Gentle step-free pavilion with direct vehicular drop-off and shaded seating; leisurely tea service with sweeping valley vistas.",
-              dist: "Level 2 min walk",
-              reserved: true,
-            },
-            {
-              slot: "Afternoon • 13:30",
-              title: "Shaded Courtyard Luncheon & Veranda Hospitality",
-              note: "Ground-level traditional dining salon featuring zero stair climbs, gentle acoustic strings, and attentive table service.",
-              dist: "Chauffeured transit",
-              reserved: false,
-            },
-            {
-              slot: "Twilight • 18:30",
-              title: "Serene Lakeside Promenade & Private Carriage Drive",
-              note: "Relaxed sunset viewing from cushioned lakeside benches; watch dusk settle over ancient stone towers without physical strain.",
-              dist: "Vehicular access",
-              reserved: true,
-            },
-          ],
-        }
-      }
-      return day
-    })
-
-    return {
-      hasItineraryUpdate: true,
-      chatReply:
-        "I've completely re-calibrated Day 2 specifically for your parents' comfort. All steep stone ascents and prolonged cobblestone walks have been replaced with direct chauffeured drop-offs, level ground-floor courtyard salons, and shaded lakeside verandas with cushioned seating. Pacing is unhurried and restful.",
-      itinerary: {
-        ...activeItinerary,
-        days: updatedDays,
-      },
-    }
-  }
-
-  // ── 3. DYNAMIC MUTATION: Authentic Kolhapuri Misal Addition ──────────────
-  if (
-    activeItinerary &&
-    (lower.includes("misal") || lower.includes("breakfast") || lower.includes("phadtare") || lower.includes("bawada"))
-  ) {
-    const updatedDays = activeItinerary.days.map((day) => {
-      if (day.day === 1 || day.day === 2) {
-        return {
-          ...day,
-          stops: day.stops.map((stop, sIdx) => {
-            if (sIdx === 0) {
-              return {
-                slot: "Morning • 08:30",
-                title: "Legendary Kolhapuri Misal at Phadtare Misal Kendra (Udyamnagar)",
-                note: "Arrive for the early morning batch; savor authentic fire-spiced sprouted moth bean curry topped with farsan, served with soft pav, fresh lime, and creamy chilled curd.",
-                dist: "Heritage culinary stop",
-                reserved: false,
-              }
-            }
-            return stop
-          }),
-        }
-      }
-      return day
-    })
-
-    return {
-      hasItineraryUpdate: true,
-      chatReply:
-        "I've added an authentic morning culinary pilgrimage to legendary Phadtare Misal Kendra in Udyamnagar! Known for their generational light-oil recipe paired with thick dahi and freshly diced onions, this is the definitive local way to start the day. The rest of your itinerary remains intact.",
-      itinerary: {
-        ...activeItinerary,
-        days: updatedDays,
-      },
-    }
-  }
-
-  // ── 4. DYNAMIC MUTATION: Mutton Thali & Regional Cuisine ──────────────────
-  if (
-    activeItinerary &&
-    (lower.includes("mutton") ||
-      lower.includes("thali") ||
-      lower.includes("dinner") ||
-      lower.includes("tambda") ||
-      lower.includes("pandhra") ||
-      lower.includes("rassa"))
-  ) {
-    const targetDayNumber = lower.includes("day 1") ? 1 : lower.includes("day 3") ? 3 : 2
-    const isKolhapur = activeItinerary.name.toLowerCase().includes("kolhapur")
-
-    const updatedDays = activeItinerary.days.map((day) => {
-      if (day.day === targetDayNumber || activeItinerary.days.length === 1) {
-        return {
-          ...day,
-          stops: day.stops.map((stop, sIdx) => {
-            if (sIdx === 2 || stop.slot.toLowerCase().includes("twilight")) {
-              return {
-                slot: "Twilight • 19:30",
-                title: isKolhapur
-                  ? "Celebrated Kolhapuri Mutton Thali at Dehati / Hotel Opal"
-                  : `${activeItinerary.name} Gastronomic Terroir Evening Feast`,
-                note: isKolhapur
-                  ? "A royal Maratha culinary institution. Experience tender slow-cooked mutton paired with spicy crimson Tambda Rassa, fragrant coconut-rich Pandhra Rassa, and hot jowar bhakri."
-                  : "Chef-curated seasonal evening menu celebrating heirloom recipes and hyper-local terroir ingredients.",
-                dist: "10 min transit",
-                reserved: true,
-              }
-            }
-            return stop
-          }),
-        }
-      }
-      return day
-    })
-
-    return {
-      hasItineraryUpdate: true,
-      chatReply:
-        "I have updated your evening itinerary with a table reserved at celebrated local institution Dehati / Hotel Opal! Savor their renowned heirloom mutton thali featuring fiery Tambda Rassa and fragrant, soothing Pandhra Rassa with hand-pressed jowar bhakri.",
-      itinerary: {
-        ...activeItinerary,
-        days: updatedDays,
-      },
-    }
-  }
-
-  // ── 5. DYNAMIC MUTATION: Budget-Friendly Under $100 / Day ──────────────────
-  if (
-    activeItinerary &&
-    (lower.includes("budget") ||
-      lower.includes("under $100") ||
-      lower.includes("under 100") ||
-      lower.includes("cheaper") ||
-      lower.includes("cost") ||
-      lower.includes("affordable"))
-  ) {
-    return {
-      hasItineraryUpdate: true,
-      chatReply:
-        "I have trimmed overall expenditure to approximately $65–$75/day. I've substituted premium private car corridors with scenic regional rail and shared transit passes, prioritized free heritage sanctums, and swapped luxury boutique hotels for charming heritage homestays. Your live Chart.js budget doughnut chart has been updated.",
-      itinerary: {
-        ...activeItinerary,
-        budgetMin: 45,
-        budgetMax: 90,
-        dailyCost: 70,
-        costBreakdown: [35, 30, 20, 15],
-        prepList: [
-          "Book boutique heritage homestays 10 days in advance to secure budget rates under $50/night",
-          "Utilize shared transit and local rail passes for cost-efficient regional transfers",
-          "Enjoy authentic family-run thali houses and bakeries for high-quality, modest-cost dining",
-          "Keep local cash on hand for small artisanal market purchases",
-        ],
-      },
-    }
-  }
-
-  // ── 6. FULL BESPOKE TRIP SYNTHESIS: Deep Regional Kolhapur Sanctuary ──────
-  if (lower.includes("kolhapur")) {
-    const kolhapurItinerary: SynthesizedItinerary = {
-      chatReply:
-        "I have crafted a 4-day circadian expedition across Kolhapur and the Western Ghats. We balance the sacred morning kakad aarti at Shri Mahalakshmi Temple, the cool mist of Panhala Fort's historic ramparts, authentic spicy Tambda & Pandhra Rassa at Dehati, and peaceful sunsets over Rankala Lake.",
-      hasItineraryUpdate: true,
-      name: "Kolhapur",
-      region: "Maharashtra, India",
-      category: "Culture",
-      rating: 4.95,
-      duration: `${days} days`,
-      budgetMin: 40,
-      budgetMax: 110,
-      dailyCost: 75,
-      season: "October — March (Crisp Winters)",
-      description:
-        "Steeped in royal Maratha valor and 7th-century Hemadpanthi stone artistry, Kolhapur is an ancient sanctuary along the Panchganga River. From centuries-old clay kushti akhadas to the Sahyadri hill fortresses and fiery, fragrant culinary traditions, this journey captures Maharashtra's untamed cultural heart.",
-      highlights: [
-        "Private dawn access to 7th-century Shri Mahalakshmi (Ambabai) Temple kakad aarti",
-        "Panhala Fortress ridge exploration amidst cool Western Ghats cloud cover",
-        "Heirloom Kolhapuri culinary tasting: fiery Tambda Rassa, soothing Pandhra Rassa, and Phadtare Misal",
-        "Artisanal visits to traditional vegetable-tanned leather chappal crafters in historic Shivaji Market",
-      ],
-      prepList: [
-        "Wear modest, breathable cotton attire suitable for traditional temple shrines",
-        "Carry light walking shoes for Panhala Fort's cobblestone stairways and stone ramparts",
-        "Sample Kolhapuri spicy mutton/veg thali early around 1:00 PM for the freshest batch",
-        "Keep Indian Rupee cash for local bazaar craft guilds and Rankala lakeside food stalls",
-      ],
-      costBreakdown: [40, 35, 15, 10],
-      days: [
-        {
-          day: 1,
-          theme: "Sacred Dawn Sanctum & Royal Maratha Architecture",
-          stops: [
-            {
-              slot: "Morning • 08:30",
-              title: "Shri Mahalakshmi (Ambabai) Temple Courtyard",
-              note: "Arrive at 08:15 AM as morning sunlight illuminates 7th-century black basalt carvings; observe morning rituals before afternoon crowds gather.",
-              dist: "Heritage Center",
-              reserved: true,
-            },
-            {
-              slot: "Afternoon • 13:30",
-              title: "New Palace (Chhatrapati Shahu Museum) & Royal Gardens",
-              note: "Explore the Anglo-Indian black stone palace, private royal armory, and clock tower preserved by the royal family.",
-              dist: "12 min transit",
-              reserved: false,
-            },
-            {
-              slot: "Twilight • 18:30",
-              title: "Rankala Lake Promenade & Sunset Tea Pavilion",
-              note: "Unwind along the peaceful paved promenade; watch dusk settle over the Rajghat stone towers with local roasted corn and ginger chai.",
-              dist: "8 min walk",
-              reserved: true,
-            },
-          ],
-        },
-        {
-          day: 2,
-          theme: "Sahyadri Fortress Heights & Terroir Gastronomy",
-          stops: [
-            {
-              slot: "Morning • 08:30",
-              title: "Panhala Fort — Teen Darwaza & Sajja Kothi Ramparts",
-              note: "Climb into the cool, mist-veiled Sahyadri mountain bastion where Chhatrapati Shivaji Maharaj held court; breathtaking valley panoramas.",
-              dist: "28 min scenic drive",
-              reserved: true,
-            },
-            {
-              slot: "Afternoon • 13:30",
-              title: "Authentic Kolhapuri Thali at Dehati / Hotel Opal",
-              note: "Savor generational Tambda (red chili) and Pandhra (white coconut-mutton broth) rassa paired with jowar bhakri.",
-              dist: "15 min transit",
-              reserved: false,
-            },
-            {
-              slot: "Twilight • 19:00",
-              title: "Bhavani Mandap Historical Court & Evening Salons",
-              note: "Walk through the historic court assembly of the Maratha kings illuminated by golden lanterns.",
-              dist: "5 min walk",
-              reserved: true,
-            },
-          ],
-        },
-        {
-          day: 3,
-          theme: "Traditional Kushti Akhadas & Artisanal Craft Guilds",
-          stops: [
-            {
-              slot: "Morning • 07:30",
-              title: "Motibaug Talim (Traditional Clay Wrestling Akhada)",
-              note: "Witness traditional kushti wrestlers training in red earth blessed with ghee and turmeric—a 150-year-old living tradition.",
-              dist: "10 min walk",
-              reserved: true,
-            },
-            {
-              slot: "Afternoon • 13:00",
-              title: "Shivaji Market & Chappal Lane Master Craftsmen",
-              note: "Meet third-generation leather artisans stitching world-famous authentic vegetable-tanned Kolhapuri footwear.",
-              dist: "6 min walk",
-              reserved: false,
-            },
-            {
-              slot: "Twilight • 18:45",
-              title: "Jyotiba Temple Hilltop Twilight Viewpoint",
-              note: "Ascend to 3,124 ft above sea level for a spiritual mountain sunset with pink gulal powder dusting the temple stones.",
-              dist: "25 min drive",
-              reserved: true,
-            },
-          ],
-        },
-        {
-          day: 4,
-          theme: "Bawada Riverbank Trails & Artisan Sweet Confections",
-          stops: [
-            {
-              slot: "Morning • 08:30",
-              title: "Bawada Riverbank Promenade & Bawada Misal Tasting",
-              note: "Enjoy a scenic morning river walk followed by a bowl of famous Bawada misal at a peaceful family-run stall.",
-              dist: "15 min transit",
-              reserved: false,
-            },
-            {
-              slot: "Afternoon • 13:30",
-              title: "Shahu Market Yard Organic Jaggery Guilds",
-              note: "Visit Asia's premier gur (jaggery) trading hub; watch master boiling artisans refine golden sugarcane juice.",
-              dist: "10 min transit",
-              reserved: false,
-            },
-            {
-              slot: "Twilight • 18:30",
-              title: "Rankala Sunset Epilogue & Local Solkadhi Tasting",
-              note: "A contemplative farewell sunset beside Rankala Lake accompanied by refreshing kokum and coconut milk solkadhi.",
-              dist: "8 min walk",
-              reserved: true,
-            },
-          ],
-        },
-      ].slice(0, days),
-    }
-
-    return {
-      chatReply: kolhapurItinerary.chatReply!,
-      hasItineraryUpdate: true,
-      itinerary: kolhapurItinerary,
-    }
-  }
-
-  // ── 7. FULL BESPOKE TRIP SYNTHESIS: Universal Geography Fallback ──────────
-  const cleanInput = input
-    .replace(/^plan a \d+[- ]day trip to /i, "")
-    .replace(/^plan \d+ days in /i, "")
-    .replace(/^trip to /i, "")
-    .replace(/^in /i, "")
-    .split(/exploring|with|focused on|and|for/i)[0]
-    .trim()
-
-  const parts = cleanInput.split(",")
-  const locationName = parts[0]?.trim() || "Global Sanctuary"
-  const regionName = parts.length > 1 ? cleanInput : `${locationName}, Regional Territory`
-
-  const dayThemes = [
-    "Arrival into Historical Heritage & Local Rhythm",
-    "Ancient Architecture, Fortresses & Sacred Courtyards",
-    "Terroir Gastronomy & Artisanal Market Corridors",
-    "Hidden Viewpoints, Lakeside Trails & Stillness",
-    "Panoramic Ridges & Twilight Tea Pavilions",
-    "Craft Workshops & Traditional Cultural Salons",
-    "Dawn Contemplation & Curated Farewell Epilogue",
-  ]
-
-  const stopsPalette = [
-    {
-      slot: "Morning • 08:30",
-      title: `${locationName} Dawn Landmark & Historical Center`,
-      note: "Arrive as morning mist lifts; local artisans open century-old courtyards before crowds arrive.",
-      dist: "8 min walk",
-      reserved: true,
-    },
-    {
-      slot: "Afternoon • 13:30",
-      title: "Regional Terroir Luncheon & Artisanal Culinary Stop",
-      note: "Authentic local specialty dining featuring heirloom ingredients and regional spice profiles.",
-      dist: "14 min transit",
-      reserved: false,
-    },
-    {
-      slot: "Twilight • 19:00",
-      title: "Sunset Promenade & Evening Cultural Salon",
-      note: "Golden hour viewpoint followed by unhurried evening tea and acoustic terrace views.",
-      dist: "10 min walk",
-      reserved: true,
-    },
-  ]
-
-  const generatedDays: DayPlan[] = []
-  for (let i = 1; i <= days; i++) {
-    const themeIndex = (i - 1) % dayThemes.length
-    generatedDays.push({
-      day: i,
-      theme: dayThemes[themeIndex],
-      stops: stopsPalette.map((stop, sIdx) => ({
-        ...stop,
-        title: sIdx === 0 ? `${locationName} ${dayThemes[themeIndex].split("&")[0]?.trim() || "Morning Sanctuary"}` : stop.title,
-      })),
-    })
-  }
-
-  const universalItinerary: SynthesizedItinerary = {
-    chatReply: `I have synthesized an authentic ${days}-day circadian journey across ${locationName}, customized for a ${pace.toLowerCase()} cadence and curated through a lens of ${lens.toLowerCase()}. All stops are proximity-calibrated with zero bottlenecking.`,
-    hasItineraryUpdate: true,
-    name: locationName,
-    region: regionName,
-    category: "Culture",
-    rating: 4.92,
-    duration: `${days} days`,
-    budgetMin: 80,
-    budgetMax: 220,
-    dailyCost: 140,
-    season: "October — March & Spring",
-    description: `A mastercrafted ${days}-day expedition through ${locationName}. Balanced around circadian energy and regional heritage, uncovering intimate viewpoints, local culinary secrets, and sacred architecture.`,
-    highlights: [
-      `Private morning access to ${locationName} landmark heritage`,
-      "Circadian dining curated around hyper-local micro-seasons",
-      "Pedestrian-optimized transit routes with zero bottlenecking",
-      "Sunset panoramas away from common tourist footfall",
-    ],
-    prepList: [
-      "Carry modest attire and easily removable footwear for historical sites",
-      "Reserve celebrated local culinary tastings 7 days in advance",
-      "Download offline regional offline trail and navigation maps",
-      "Keep local cash currency for street artisans and family-run bakeries",
-    ],
-    costBreakdown: [45, 30, 15, 10],
-    days: generatedDays,
-  }
-
-  return {
-    chatReply: universalItinerary.chatReply!,
-    hasItineraryUpdate: true,
-    itinerary: universalItinerary,
   }
 }

@@ -261,17 +261,19 @@ function AIPlannerContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-gemini-key": apiKey || "",
+          ...(apiKey ? { "x-gemini-key": apiKey } : {}),
         },
         body: JSON.stringify({
           prompt: trimmed,
           message: trimmed,
           destination: targetDest,
           days: targetDays,
+          travelers: 2,
+          budget: "Moderate",
           pace: targetPace,
           lens: targetLens,
           currency,
-          apiKey,
+          apiKey: apiKey || undefined,
           currentItinerary: itinerary,
           history: conversationHistory.map((m) => ({
             role: m.role === "user" ? "user" : "model",
@@ -281,6 +283,29 @@ function AIPlannerContent() {
       })
 
       const data = await res.json()
+
+      // Handle Genuine API Failures (No Silent Mock / Fake Success)
+      if (!res.ok || data.success === false) {
+        const errorMsg = data.error || `Error ${res.status}: Failed to synthesize itinerary.`
+        toast({
+          title: "Synthesis Error",
+          description: errorMsg,
+          variant: "destructive",
+        })
+        const errId = `ai-err-${Date.now()}`
+        setConversationHistory((prev) => [
+          ...prev,
+          {
+            id: errId,
+            role: "ai",
+            text: `⚠️ **Concierge Notice**: ${errorMsg}`,
+            timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            timestampMs: Date.now(),
+          },
+        ])
+        return
+      }
+
       const aiReply =
         data.chatReply ||
         data.itinerary?.chatReply ||
@@ -305,7 +330,7 @@ function AIPlannerContent() {
       // 3. Intelligent Query Routing: only mutate itinerary if updated
       if (data.hasItineraryUpdate !== false && data.itinerary) {
         setItinerary(data.itinerary)
-        setSourceModel(data.source || (hasKey ? "gemini-2.5-flash" : "curated-sanctuary"))
+        setSourceModel(data.source || "gemini-2.5-flash")
         setSelectedDay(1)
         if (data.itinerary.name) setDestination(data.itinerary.name)
         if (data.itinerary.days?.length) setDays(data.itinerary.days.length)
@@ -321,11 +346,22 @@ function AIPlannerContent() {
         })
       }
     } catch (err: any) {
-      console.warn("Client synthesis notice:", err)
+      const netErr = err?.message || "Failed to communicate with AERIS itinerary synthesis server."
       toast({
-        title: "Synthesis Notice",
-        description: "Engaging AERIS Universal Curated Engine.",
+        title: "Connection Notice",
+        description: netErr,
+        variant: "destructive",
       })
+      setConversationHistory((prev) => [
+        ...prev,
+        {
+          id: `ai-err-${Date.now()}`,
+          role: "ai",
+          text: `⚠️ **System Notice**: ${netErr}`,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          timestampMs: Date.now(),
+        },
+      ])
     } finally {
       isExecutingRef.current = false
       setLoading(false)

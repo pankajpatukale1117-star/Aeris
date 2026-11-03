@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server"
-import { GoogleGenAI } from "@google/genai"
 
 export async function POST(request: Request) {
   try {
@@ -19,20 +18,25 @@ export async function POST(request: Request) {
 
     const apiKey = process.env.GEMINI_API_KEY
 
-    // If Gemini API key is present and not placeholder, call Google GenAI
-    if (apiKey && apiKey !== "your_gemini_api_key" && !apiKey.includes("placeholder")) {
-      try {
-        const ai = new GoogleGenAI({ apiKey })
+    if (!apiKey || apiKey === "your_gemini_api_key" || apiKey.includes("placeholder")) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Gemini API key is not configured. Please set GEMINI_API_KEY in .env.local.",
+        },
+        { status: 401 }
+      )
+    }
 
-        const prompt = `You are the lead travel architect for AERIS, a luxury travel-tech product.
-Generate a structured, highly realistic travel itinerary based on:
+    const prompt = `You are the lead travel architect for AERIS, a luxury travel-tech product.
+Generate a structured, highly realistic, non-generic travel itinerary based on:
 - Origin: ${origin}
 - Destination: ${destination}
 - Dates: ${departureDate} to ${returnDate}
 - Travelers: ${travelers}
 - Budget Level: ${budget}
 - Preferred Pace: ${pace}
-- Interests: ${interests.join(", ")}
+- Interests: ${Array.isArray(interests) ? interests.join(", ") : interests}
 - Transportation: ${transportation}
 - Accommodation: ${accommodation}
 
@@ -78,158 +82,56 @@ You MUST return pure JSON matching this exact structure:
 
 DO NOT include markdown code fences (\`\`\`json). Return ONLY valid raw JSON.`
 
-        const response = await ai.models.generateContent({
-          model: "gemini-2.5-flash",
-          contents: prompt,
+    const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+    let lastError: any = null
+
+    for (const m of models) {
+      try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${encodeURIComponent(apiKey)}`
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              temperature: 0.7,
+              maxOutputTokens: 6000,
+            },
+          }),
         })
 
-        const text = response.text || ""
-        const cleanJson = text.replace(/```json/g, "").replace(/```/g, "").trim()
-        const parsed = JSON.parse(cleanJson)
-
-        return NextResponse.json({ success: true, itinerary: parsed, source: "gemini" })
-      } catch (geminiError: any) {
-        console.warn("Gemini API call failed, using high-fidelity fallback:", geminiError)
+        if (res.ok) {
+          const data = await res.json()
+          const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
+          const cleanJson = text.replace(/```json/gi, "").replace(/```/g, "").trim()
+          const parsed = JSON.parse(cleanJson)
+          return NextResponse.json({ success: true, itinerary: parsed, source: m })
+        } else {
+          const status = res.status
+          const errData = await res.json().catch(() => null)
+          lastError = { status, message: errData?.error?.message || res.statusText }
+          if (status === 404 || status === 429 || status === 503) continue
+        }
+      } catch (err: any) {
+        lastError = { status: 500, message: err.message }
       }
     }
 
-    // High-fidelity curated fallback matching AERIS's standards
-    const mockItinerary = {
-      title: `${pace.charAt(0).toUpperCase() + pace.slice(1)} Discovery in ${destination}`,
-      destination: destination,
-      overview: `A bespoke journey through ${destination} crafted for ${travelers} traveler(s). Experience the finest local culture, hand-picked dining, and unforgettable scenic landmarks aligned with your interest in ${interests.slice(0, 2).join(" & ")}.`,
-      durationDays: 7,
-      estimatedBudget: budget === "luxury" ? "$4,500 total" : "$2,200 total",
-      budgetBreakdown: {
-        accommodation: budget === "luxury" ? "$2,400" : "$1,100",
-        foodAndDining: budget === "luxury" ? "$1,200" : "$650",
-        activities: budget === "luxury" ? "$600" : "$300",
-        localTransport: budget === "luxury" ? "$300" : "$150",
+    return NextResponse.json(
+      {
+        success: false,
+        error: lastError?.message || "Failed to generate itinerary with Gemini API.",
       },
-      travelTips: [
-        `Book landmark reservations at least 2 weeks in advance for ${destination}.`,
-        "Utilize high-speed rail or local transit passes for effortless navigation between districts.",
-        "Keep local currency cash handy for neighborhood food markets and artisanal craft vendors.",
-      ],
-      days: [
-        {
-          dayNumber: 1,
-          date: "Day 1",
-          title: "Arrival, Acclimatization & Evening Heritage",
-          description: "Arrive, check into your accommodation, and soak in your first golden hour views followed by a welcome dinner.",
-          activities: [
-            {
-              id: "act-1-1",
-              time: "14:00",
-              title: "Check-in & Rest",
-              description: "Unpack and freshen up at your boutique hotel.",
-              duration: "1.5h",
-              location: "City Center",
-              estimatedCost: "Included",
-              category: "Accommodation",
-            },
-            {
-              id: "act-1-2",
-              time: "17:30",
-              title: "Sunset Orientation Walk",
-              description: "Gentle stroll through the historic quarter to experience local architecture and evening ambiance.",
-              duration: "1.5h",
-              location: "Old Town Promenade",
-              estimatedCost: "Free",
-              category: "Sightseeing",
-            },
-            {
-              id: "act-1-3",
-              time: "19:30",
-              title: "Welcome Gastronomic Tasting",
-              description: "Multi-course seasonal dinner featuring regional specialties and local wine pairings.",
-              duration: "2h",
-              location: "Artisanal Bistro",
-              estimatedCost: "$75/person",
-              category: "Food",
-            },
-          ],
-        },
-        {
-          dayNumber: 2,
-          date: "Day 2",
-          title: "Iconic Landmarks & Cultural immersion",
-          description: "Explore the destination's most celebrated historical sites with early access.",
-          activities: [
-            {
-              id: "act-2-1",
-              time: "08:30",
-              title: "Morning Heritage Site Tour",
-              description: "Visit the world-famous architectural monument before peak tourist volume.",
-              duration: "2.5h",
-              location: "Historic Landmark",
-              estimatedCost: "$25",
-              category: "Culture",
-            },
-            {
-              id: "act-2-2",
-              time: "12:30",
-              title: "Market Hall Lunch & Tasting",
-              description: "Sample street delights and fresh seasonal produce from local purveyors.",
-              duration: "1.5h",
-              location: "Central Market",
-              estimatedCost: "$20",
-              category: "Food",
-            },
-            {
-              id: "act-2-3",
-              time: "15:00",
-              title: "Scenic Panoramic Viewpoint",
-              description: "Take the cable car or funicular up to the highest viewpoint for 360-degree vistas.",
-              duration: "2h",
-              location: "Summit Lookout",
-              estimatedCost: "$15",
-              category: "Adventure",
-            },
-          ],
-        },
-        {
-          dayNumber: 3,
-          date: "Day 3",
-          title: "Nature Excursion & Hidden Gems",
-          description: "Escape the bustling core to discover tranquil nature paths, coastal lookouts, or mountain gardens.",
-          activities: [
-            {
-              id: "act-3-1",
-              time: "09:00",
-              title: "Wilderness Nature Hike",
-              description: "Guided moderate walk along scenic trails surrounded by native flora and viewpoints.",
-              duration: "3h",
-              location: "National Park / Reserve",
-              estimatedCost: "$10",
-              category: "Nature",
-            },
-            {
-              id: "act-3-2",
-              time: "13:30",
-              title: "Courtyard Garden Lunch",
-              description: "Relaxed dining in a leafy garden with organic regional ingredients.",
-              duration: "1.5h",
-              location: "Garden Café",
-              estimatedCost: "$30",
-              category: "Food",
-            },
-          ],
-        },
-      ],
-    }
-
-    return NextResponse.json({
-      success: true,
-      itinerary: mockItinerary,
-      source: "demo-engine",
-      note: "Generated with AERIS Curated Engine. Add GEMINI_API_KEY to .env.local for live LLM synthesis.",
-    })
+      { status: lastError?.status && lastError.status >= 400 ? lastError.status : 502 }
+    )
   } catch (err: any) {
     return NextResponse.json(
-      { success: false, error: err.message || "Failed to generate itinerary" },
+      {
+        success: false,
+        error: err?.message || "Internal server error.",
+      },
       { status: 500 }
     )
   }
 }
-

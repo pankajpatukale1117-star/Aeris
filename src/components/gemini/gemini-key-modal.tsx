@@ -37,8 +37,8 @@ export function GeminiKeyModal() {
 
     setTesting(true)
     try {
-      // Test the key against Google Gemini API
-      const testRes = await fetch(
+      // Test the key against Google Gemini Flash API (try 2.5 Flash, then 3.5 Flash Lite if 404)
+      let testRes = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(trimmed)}`,
         {
           method: "POST",
@@ -49,6 +49,20 @@ export function GeminiKeyModal() {
           }),
         }
       )
+
+      if (testRes.status === 404) {
+        testRes = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${encodeURIComponent(trimmed)}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ role: "user", parts: [{ text: "ping" }] }],
+              generationConfig: { maxOutputTokens: 1 },
+            }),
+          }
+        )
+      }
 
       if (testRes.ok) {
         setApiKey(trimmed)
