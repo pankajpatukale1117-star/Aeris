@@ -1,0 +1,190 @@
+@import "tailwindcss";
+
+/* ─── ROVEO Editorial Design Tokens ───────────────────────────────────────── */
+:root {
+  /* Brand Core Palette */
+  --roveo-canvas: #F8F7F4;
+  --roveo-midnight: #101E2B;
+  --roveo-navy: #172B3A;
+  --roveo-sage: #A5C7BA;
+  --roveo-teal: #6D9D94;
+  --roveo-text-primary: #18232D;
+  --roveo-text-secondary: #78848C;
+
+  /* Semantic System (Light - Warm Editorial Paper) */
+  --background: #F8F7F4;
+  --foreground: #18232D;
+  --card: #FFFFFF;
+  --card-foreground: #18232D;
+  --popover: #FFFFFF;
+  --popover-foreground: #18232D;
+  
+  --primary: #101E2B;
+  --primary-foreground: #F8F7F4;
+  --secondary: #EAE6DF;
+  --secondary-foreground: #101E2B;
+  --muted: #F0EDE6;
+  --muted-foreground: #78848C;
+  --accent: #6D9D94;
+  --accent-foreground: #F8F7F4;
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+  --border: rgba(24, 35, 45, 0.08);
+  --input: rgba(24, 35, 45, 0.12);
+  --ring: #6D9D94;
+  --radius: 1rem;
+
+  /* Glassmorphism Specification */
+  --glass-bg: rgba(248, 247, 244, 0.72);
+  --glass-border: rgba(255, 255, 255, 0.65);
+  --glass-shadow: 0 20px 40px -15px rgba(16, 30, 43, 0.07);
+
+  --font-serif: "Playfair Display", "Newsreader", Georgia, serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Plus Jakarta Sans", "Inter", sans-serif;
+}
+
+.dark {
+  /* Semantic System (Dark - Deep Midnight Blue) */
+  --background: #101E2B;
+  --foreground: #F8F7F4;
+  --card: #172B3A;
+  --card-foreground: #F8F7F4;
+  --popover: #172B3A;
+  --popover-foreground: #F8F7F4;
+  
+  --primary: #A5C7BA;
+  --primary-foreground: #101E2B;
+  --secondary: #1F3344;
+  --secondary-foreground: #F8F7F4;
+  --muted: #1A2E3D;
+  --muted-foreground: #8FA1AC;
+  --accent: #6D9D94;
+  --accent-foreground: #101E2B;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+  --input: rgba(255, 255, 255, 0.12);
+  --ring: #A5C7BA;
+
+  /* Glassmorphism Specification (Night) */
+  --glass-bg: rgba(16, 30, 43, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Global Base Settings ────────────────────────────────────────────────── */
+*, *::before, *::after {
+  border-color: var(--border);
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+/* ─── Editorial Typography ────────────────────────────────────────────────── */
+.font-display, .font-serif-editorial {
+  font-family: var(--font-serif);
+  font-feature-settings: "kern", "liga", "dlig";
+}
+
+/* Editorial micro-labels */
+.editorial-tag {
+  font-size: 0.625rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* ─── True Architectural Glassmorphism ────────────────────────────────────── */
+.glass-surface {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-shadow);
+}
+
+.glass-dock {
+  background: rgba(248, 247, 244, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 16px 36px rgba(16, 30, 43, 0.08);
+}
+
+.dark .glass-dock {
+  background: rgba(16, 30, 43, 0.82);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
+}
+
+.glass-pill {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.dark .glass-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* ─── Editorial Image Mask & Vignettes ─────────────────────────────────────── */
+.editorial-overlay-gradient {
+  background: linear-gradient(
+    180deg,
+    rgba(16, 30, 43, 0.1) 0%,
+    rgba(16, 30, 43, 0.3) 50%,
+    rgba(16, 30, 43, 0.88) 100%
+  );
+}
+
+.hero-vignette {
+  background: radial-gradient(
+    circle at center,
+    rgba(16, 30, 43, 0.2) 0%,
+    rgba(16, 30, 43, 0.65) 75%,
+    rgba(16, 30, 43, 0.9) 100%
+  );
+}
+
+/* ─── Scrollbars & Transitions ────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(24, 35, 45, 0.15);
+  border-radius: 9999px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.editorial-card-hover {
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.editorial-card-hover:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 48px -12px rgba(16, 30, 43, 0.12);
+}
