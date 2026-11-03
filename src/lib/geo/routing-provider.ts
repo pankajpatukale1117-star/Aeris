@@ -70,17 +70,24 @@ export async function calculateRoute(
     throw new Error("At least 2 waypoints are required to calculate a route.")
   }
 
-  // Format waypoints as lon,lat;lon,lat for OSRM
+  // Format waypoints as lon,lat;lon,lat for OSRM / Route engines
   const coordsString = waypoints.map((w) => `${w.lng},${w.lat}`).join(";")
 
+  const routeApiKey = process.env.INTERACTIVE_ROUTE_API_KEY || ""
+  const customEndpoint = process.env.INTERACTIVE_ROUTE_ENDPOINT || ""
+
   try {
-    const url = `https://router.project-osrm.org/route/v1/${mode}/${coordsString}?overview=full&geometries=geojson&steps=false`
+    const baseUrl = customEndpoint || "https://router.project-osrm.org"
+    const url = `${baseUrl}/route/v1/${mode}/${coordsString}?overview=full&geometries=geojson&steps=false${routeApiKey ? `&key=${encodeURIComponent(routeApiKey)}` : ""}`
 
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 7000)
 
     const res = await fetch(url, {
-      headers: { "User-Agent": "AERIS-Travel-Intelligence/2.0" },
+      headers: {
+        "User-Agent": "AERIS-Travel-Intelligence/2.0",
+        ...(routeApiKey ? { "x-api-key": routeApiKey, Authorization: `Bearer ${routeApiKey}` } : {}),
+      },
       signal: controller.signal,
     }).finally(() => clearTimeout(timer))
 
