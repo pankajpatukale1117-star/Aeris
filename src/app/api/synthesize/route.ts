@@ -97,45 +97,51 @@ Return a strict JSON object with this exact schema:
   ]
 }`
 
-        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(activeKey)}`
-
-        const geminiRes = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [
-              {
-                role: "user",
-                parts: [{ text: systemPrompt }],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "application/json",
-              temperature: 0.7,
-              maxOutputTokens: 5000,
-            },
-          }),
-        })
-
-        if (geminiRes.ok) {
-          const data = await geminiRes.json()
-          const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
-          if (rawText) {
-            // JSON Sanitizer: strip code fences
-            const clean = rawText
-              .replace(/```json/gi, "")
-              .replace(/```/g, "")
-              .trim()
-            const parsed: SynthesizedItinerary = JSON.parse(clean)
-
-            return NextResponse.json({
-              success: true,
-              source: "gemini-2.5-flash",
-              itinerary: parsed,
+        const candidateModels = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash"]
+        for (const modelName of candidateModels) {
+          try {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${encodeURIComponent(activeKey)}`
+            const geminiRes = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [
+                  {
+                    role: "user",
+                    parts: [{ text: systemPrompt }],
+                  },
+                ],
+                generationConfig: {
+                  responseMimeType: "application/json",
+                  temperature: 0.7,
+                  maxOutputTokens: 5000,
+                },
+              }),
             })
+
+            if (geminiRes.ok) {
+              const data = await geminiRes.json()
+              const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || ""
+              if (rawText) {
+                // JSON Sanitizer: strip code fences
+                const clean = rawText
+                  .replace(/```json/gi, "")
+                  .replace(/```/g, "")
+                  .trim()
+                const parsed: SynthesizedItinerary = JSON.parse(clean)
+
+                return NextResponse.json({
+                  success: true,
+                  source: modelName,
+                  itinerary: parsed,
+                })
+              }
+            } else {
+              console.warn(`${modelName} status not ok (${geminiRes.status}), trying next candidate...`)
+            }
+          } catch (modelErr) {
+            console.warn(`Error trying ${modelName}:`, modelErr)
           }
-        } else {
-          console.warn("Gemini 2.5 Flash status not ok:", geminiRes.status, await geminiRes.text())
         }
       } catch (geminiError) {
         console.warn("Gemini live call error, activating universal editorial fallback:", geminiError)
