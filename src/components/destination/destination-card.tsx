@@ -3,7 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
-import { Bookmark, Star, MapPin, ArrowUpRight } from "lucide-react"
+import { Bookmark, Star, MapPin } from "lucide-react"
 import { Destination } from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore } from "@/lib/store/travel-store"
@@ -47,21 +47,13 @@ export function DestinationCard({
     })
   }
 
-  // Strict height containment per Anti-Breakage Rule 2
-  const heightClass =
-    variant === "spotlight"
-      ? "h-72 sm:h-80"
-      : variant === "landscape"
-      ? "h-60 sm:h-64"
-      : "h-56 sm:h-64"
-
   return (
     <Link
       href={`/destinations/${destination.id}`}
       className="group relative block rounded-3xl overflow-hidden glass-card transition-all duration-500 hover:shadow-2xl"
     >
-      {/* Strict Image Containment Container (Rule 2) */}
-      <div className={`relative ${heightClass} w-full overflow-hidden`}>
+      {/* Strict Image Containment Container: Bounded relative h-56 w-full overflow-hidden */}
+      <div className="relative h-56 sm:h-64 w-full overflow-hidden">
         <Image
           src={destination.image}
           alt={destination.name}
@@ -96,13 +88,13 @@ export function DestinationCard({
         <div className="absolute bottom-0 left-0 right-0 p-5 sm:p-6 text-[#f1f5f9] z-10 space-y-2">
           {/* Location Subtitle */}
           <div className="flex items-center gap-1.5 text-xs text-[#e8d5b5] font-medium tracking-wide">
-            <MapPin className="w-3.5 h-3.5" />
-            <span>{destination.location}, {destination.country}</span>
+            <MapPin className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">{destination.location}, {destination.country}</span>
           </div>
 
           {/* Editorial Heading */}
           <div className="flex items-baseline justify-between gap-3">
-            <h3 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#e8d5b5] transition-colors duration-300">
+            <h3 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#e8d5b5] transition-colors duration-300 truncate">
               {destination.name}
             </h3>
 
@@ -113,14 +105,14 @@ export function DestinationCard({
           </div>
 
           {/* Description Snippet */}
-          <p className="text-xs text-[#94a3b8] line-clamp-2 leading-relaxed">
+          <p className="text-xs text-[#94a3b8] line-clamp-2 leading-relaxed font-light">
             {destination.description}
           </p>
 
-          {/* Bottom Telemetry Bar: Duration & Budget */}
-          <div className="pt-3 border-t border-white/[0.1] flex items-center justify-between text-[11px] text-[#94a3b8] font-medium">
-            <span className="text-[#38bdf8]">{destination.recommendedDuration}</span>
-            <span className="text-white font-semibold">{destination.approximateBudget}</span>
+          {/* Bottom Telemetry Bar: Fixed Un-squished Duration & Budget Row */}
+          <div className="pt-3 border-t border-white/10 flex items-center justify-between w-full text-xs font-medium">
+            <span className="text-[#38bdf8] font-medium tracking-wide">{destination.recommendedDuration}</span>
+            <span className="text-white font-semibold tracking-wide">{destination.approximateBudget}</span>
           </div>
         </div>
       </div>

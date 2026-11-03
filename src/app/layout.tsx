@@ -47,6 +47,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
           rel="stylesheet"
         />
+        {/* Leaflet CSS loaded via CDN to avoid PostCSS subprocess bottlenecks */}
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
         {/* Tailwind CDN as guaranteed fallback anti-breakage safeguard */}
         <script src="https://cdn.tailwindcss.com"></script>
         <script
@@ -77,14 +79,20 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="font-sans antialiased bg-[#050a10] text-[#f1f5f9] min-h-screen flex flex-col selection:bg-[#e8d5b5]/30 selection:text-white">
+      <body className="font-sans antialiased bg-[#050a10] text-[#f1f5f9] min-h-screen flex flex-col selection:bg-[#e8d5b5]/30 selection:text-white relative overflow-x-hidden">
+        {/* Ambient Blurred Aurora Orbs */}
+        <div className="aurora-orb aurora-cyan w-[30rem] h-[30rem] -top-24 -left-24 fixed pointer-events-none" />
+        <div className="aurora-orb aurora-champagne w-[30rem] h-[30rem] top-1/2 -right-24 fixed pointer-events-none" />
+
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
           forcedTheme="dark"
           disableTransitionOnChange
         >
-          {children}
+          <div className="relative z-10 flex-1 flex flex-col">
+            {children}
+          </div>
           <Toaster />
         </ThemeProvider>
       </body>

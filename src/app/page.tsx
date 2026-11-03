@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import { Navbar } from "@/components/layout/navbar"
 import { Footer } from "@/components/layout/footer"
+import { MobileNav } from "@/components/layout/mobile-nav"
 import { DESTINATIONS, TRAVEL_STYLES } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
 
@@ -500,8 +501,13 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── FOOTER ───────────────────────────────────────────────────────── */}
+      {/* ─── AMBIENT AURORA ORBS ────────────────────────────────────────── */}
+      <div className="aurora-orb aurora-cyan w-[32rem] h-[32rem] top-[20%] -left-36 pointer-events-none" />
+      <div className="aurora-orb aurora-champagne w-[32rem] h-[32rem] top-[60%] -right-36 pointer-events-none" />
+
+      {/* ─── FOOTER & MOBILE DOCK ─────────────────────────────────────────── */}
       <Footer />
+      <MobileNav />
     </div>
   )
 }
