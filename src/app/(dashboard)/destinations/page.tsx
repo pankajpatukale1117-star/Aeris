@@ -27,14 +27,17 @@ const SORT_OPTIONS = [
 function DestinationsContent() {
   const searchParams = useSearchParams()
   const initialCategory = searchParams.get("category") || "All"
+  const initialQuery = searchParams.get("query") || searchParams.get("search") || ""
 
-  const [searchQuery, setSearchQuery] = React.useState("")
+  const [searchQuery, setSearchQuery] = React.useState(initialQuery === "All" ? "" : initialQuery)
   const [selectedCategory, setSelectedCategory] = React.useState(initialCategory)
   const [sortBy, setSortBy] = React.useState("rating")
 
   React.useEffect(() => {
     const cat = searchParams.get("category")
     if (cat) setSelectedCategory(cat)
+    const q = searchParams.get("query") || searchParams.get("search")
+    if (q && q !== "All") setSearchQuery(q)
   }, [searchParams])
 
   const filteredDestinations = React.useMemo(() => {

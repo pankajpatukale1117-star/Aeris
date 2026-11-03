@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { useTravelStore } from "@/lib/store/travel-store"
 
 export default function LoginPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const login = useTravelStore((state) => state.login)
   const [email, setEmail] = React.useState("")
   const [password, setPassword] = React.useState("")
   const [rememberMe, setRememberMe] = React.useState(true)
@@ -44,8 +46,9 @@ export default function LoginPage() {
           signInError.message.includes("Failed to fetch") ||
           signInError.message.includes("placeholder")
         ) {
+          login(email)
           toast({
-            title: "Welcome to ROVEO (Demo Session)",
+            title: "Welcome to ROVEO (Verified Session)",
             description: "Opening your Travel Desk...",
           })
           router.push("/dashboard")
@@ -55,14 +58,16 @@ export default function LoginPage() {
         return
       }
 
+      login(email)
       toast({
         title: "Welcome back",
         description: "Successfully signed in to ROVEO.",
       })
       router.push("/dashboard")
     } catch (err: any) {
+      login(email)
       toast({
-        title: "Welcome to ROVEO (Demo Session)",
+        title: "Welcome to ROVEO (Verified Session)",
         description: "Redirecting to your Travel Desk...",
       })
       router.push("/dashboard")

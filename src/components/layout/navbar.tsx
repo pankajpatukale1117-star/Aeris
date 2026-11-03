@@ -2,18 +2,33 @@
 
 import * as React from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { usePathname } from "next/navigation"
-import { Compass, Sparkles, MapPin, Calendar, Menu, X, Sun, Moon, ArrowRight, User } from "lucide-react"
+import { Compass, Sparkles, MapPin, Calendar, Menu, X, Sun, Moon, ArrowRight, User, LogOut, LayoutDashboard } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
+import { useTravelStore } from "@/lib/store/travel-store"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = React.useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false)
+  const [mounted, setMounted] = React.useState(false)
   const { theme, setTheme } = useTheme()
   const pathname = usePathname()
 
+  const user = useTravelStore((state) => state.user)
+  const logout = useTravelStore((state) => state.logout)
+
   React.useEffect(() => {
+    setMounted(true)
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 30)
     }
@@ -91,13 +106,57 @@ export function Navbar() {
             <Moon className="w-4 h-4 block dark:hidden" />
           </button>
 
-          <Link href="/login">
-            <span className="text-xs font-medium text-[#18232D]/80 dark:text-[#F8F7F4]/80 hover:text-[#101E2B] dark:hover:text-[#F8F7F4] px-3 py-1.5 transition-colors">
-              Login
-            </span>
-          </Link>
+          {mounted && user.isAuthenticated ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-2 px-3 py-1.5 rounded-full glass-dock border border-black/10 dark:border-white/15 text-xs font-semibold hover:border-[#6D9D94] transition-colors">
+                  <div className="w-6 h-6 rounded-full overflow-hidden bg-[#101E2B] text-white flex items-center justify-center relative text-[10px]">
+                    {user.avatarUrl ? (
+                      <Image src={user.avatarUrl} alt={user.fullName} fill className="object-cover" />
+                    ) : (
+                      user.fullName.charAt(0)
+                    )}
+                  </div>
+                  <span className="truncate max-w-[100px]">{user.fullName.split(" ")[0]}</span>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-2xl p-1.5 text-xs shadow-xl">
+                <DropdownMenuLabel className="font-normal px-2.5 py-1.5">
+                  <div className="font-semibold text-sm">{user.fullName}</div>
+                  <div className="text-[10px] text-[#78848C] truncate">{user.email || user.tier}</div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard" className="flex items-center gap-2 cursor-pointer rounded-xl px-2.5 py-1.5">
+                    <LayoutDashboard className="w-3.5 h-3.5 text-[#6D9D94]" />
+                    <span>Travel Desk</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/trips" className="flex items-center gap-2 cursor-pointer rounded-xl px-2.5 py-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-[#6D9D94]" />
+                    <span>My Journeys</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={logout}
+                  className="flex items-center gap-2 cursor-pointer rounded-xl px-2.5 py-1.5 text-red-500 focus:text-red-500 focus:bg-red-50 dark:focus:bg-red-950/20"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Link href="/login">
+              <span className="text-xs font-medium text-[#18232D]/80 dark:text-[#F8F7F4]/80 hover:text-[#101E2B] dark:hover:text-[#F8F7F4] px-3 py-1.5 transition-colors">
+                Login
+              </span>
+            </Link>
+          )}
 
-          <Link href="/ai-planner">
+          <Link href="/trips/new">
             <Button
               size="sm"
               className="rounded-full bg-[#101E2B] hover:bg-[#172B3A] dark:bg-[#F8F7F4] dark:hover:bg-white text-white dark:text-[#101E2B] font-medium text-xs px-5 py-2 shadow-sm transition-all hover:shadow-md"
@@ -140,23 +199,39 @@ export function Navbar() {
               >
                 <span>{link.name}</span>
                 {link.badge && (
-                  <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded-full bg-[#6D9D94]/20 text-[#6D9D94]">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#6D9D94]/20 text-[#6D9D94]">
                     {link.badge}
                   </span>
                 )}
               </Link>
             ))}
 
-            <div className="my-2 border-t border-black/10 dark:border-white/10" />
+            <Link
+              href="/dashboard"
+              className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium text-[#18232D] dark:text-[#F8F7F4] hover:bg-black/5 dark:hover:bg-white/10"
+            >
+              <span>Travel Desk</span>
+            </Link>
 
-            <div className="flex flex-col gap-2 pt-1">
-              <Link href="/login" className="w-full">
-                <Button variant="ghost" className="w-full justify-center text-xs h-9">
-                  Login to Account
-                </Button>
-              </Link>
-              <Link href="/ai-planner" className="w-full">
-                <Button className="w-full justify-center text-xs h-10 rounded-full bg-[#101E2B] text-white dark:bg-[#F8F7F4] dark:text-[#101E2B]">
+            <div className="pt-3 border-t border-black/[0.08] dark:border-white/[0.08] flex items-center justify-between gap-3">
+              {mounted && user.isAuthenticated ? (
+                <button
+                  onClick={logout}
+                  className="text-xs font-semibold text-red-500 py-2 px-3"
+                >
+                  Sign Out ({user.fullName.split(" ")[0]})
+                </button>
+              ) : (
+                <Link
+                  href="/login"
+                  className="text-xs font-semibold text-[#18232D] dark:text-[#F8F7F4] py-2 px-3"
+                >
+                  Sign In
+                </Link>
+              )}
+
+              <Link href="/trips/new" className="flex-1">
+                <Button className="w-full rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] text-xs">
                   Start Planning
                 </Button>
               </Link>

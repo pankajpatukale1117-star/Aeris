@@ -2,17 +2,24 @@
 
 import * as React from "react"
 import Link from "next/link"
-import { Bookmark, Compass } from "lucide-react"
+import { Bookmark, Compass, Sparkles } from "lucide-react"
 import { DESTINATIONS } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
 import { Button } from "@/components/ui/button"
+import { useTravelStore } from "@/lib/store/travel-store"
 
 export default function SavedPage() {
-  const [savedList, setSavedList] = React.useState(DESTINATIONS.slice(0, 4))
+  const savedDestinationIds = useTravelStore((state) => state.savedDestinationIds)
+  const [mounted, setMounted] = React.useState(false)
 
-  const handleRemove = (id: string) => {
-    setSavedList((prev) => prev.filter((d) => d.id !== id))
-  }
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const savedList = React.useMemo(() => {
+    if (!mounted) return []
+    return DESTINATIONS.filter((d) => savedDestinationIds.includes(d.id))
+  }, [mounted, savedDestinationIds])
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500 max-w-6xl mx-auto">
@@ -20,19 +27,28 @@ export default function SavedPage() {
         <div className="space-y-1">
           <span className="editorial-tag text-[#6D9D94]">Travel Desk</span>
           <h1 className="font-display text-3xl sm:text-5xl font-bold tracking-tight text-[#18232D] dark:text-[#F8F7F4]">
-            Saved Destinations
+            Saved Destinations ({mounted ? savedList.length : "..."})
           </h1>
           <p className="text-sm text-[#78848C]">
             Curated bookmarks ready to be synthesized into defining journeys.
           </p>
         </div>
 
-        <Link href="/destinations">
-          <Button variant="outline" size="sm" className="rounded-full gap-2 text-xs border-black/10 dark:border-white/10 px-5 py-5">
-            <Compass className="w-3.5 h-3.5 text-[#6D9D94]" />
-            <span>Browse Full Atlas</span>
-          </Button>
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link href="/destinations">
+            <Button variant="outline" size="sm" className="rounded-full gap-2 text-xs border-black/10 dark:border-white/10 px-5 py-5">
+              <Compass className="w-3.5 h-3.5 text-[#6D9D94]" />
+              <span>Browse Full Atlas</span>
+            </Button>
+          </Link>
+
+          <Link href="/ai-planner">
+            <Button size="sm" className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] gap-2 text-xs px-5 py-5">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Plan with AI</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {savedList.length > 0 ? (
@@ -42,7 +58,6 @@ export default function SavedPage() {
               key={destination.id}
               destination={destination}
               isSaved={true}
-              onSave={handleRemove}
               variant="portrait"
             />
           ))}

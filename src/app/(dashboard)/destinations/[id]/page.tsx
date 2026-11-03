@@ -17,19 +17,52 @@ import {
   Share2,
   Compass,
   ArrowRight,
+  Navigation,
 } from "lucide-react"
 import { DESTINATIONS } from "@/lib/constants"
 import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
+import { useTravelStore } from "@/lib/store/travel-store"
+import { TripMap, MapPoint } from "@/components/map/trip-map"
+
+const DESTINATION_COORDINATES: Record<string, [number, number]> = {
+  "santorini-greece": [36.3932, 25.4615],
+  "kyoto-japan": [35.0116, 135.7681],
+  "bali-indonesia": [-8.4095, 115.1889],
+  "paris-france": [48.8566, 2.3522],
+  "machu-picchu-peru": [-13.1631, -72.5450],
+  "maldives": [3.2028, 73.2207],
+  "iceland-aurora": [64.1466, -21.9426],
+  "safari-kenya": [-1.2921, 36.8219],
+  "amalfi-coast-italy": [40.6340, 14.6027],
+  "new-york-city-usa": [40.7128, -74.0060],
+  "bangkok-thailand": [13.7563, 100.5018],
+  "new-zealand-south-island": [-45.0312, 168.6626],
+  "patagonia-argentina": [-50.5000, -73.0000],
+  "dubai-uae": [25.2048, 55.2708],
+  "prague-czech-republic": [50.0755, 14.4378],
+  "marrakech-morocco": [31.6295, -7.9811],
+  "costa-rica": [9.7489, -83.7534],
+  "swiss-alps": [46.5606, 7.9147],
+  "rio-de-janeiro-brazil": [-22.9068, -43.1729],
+  "singapore": [1.3521, 103.8198],
+}
 
 export default function DestinationDetailPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const [isSaved, setIsSaved] = React.useState(false)
 
   const destinationId = params?.id as string
   const destination = DESTINATIONS.find((d) => d.id === destinationId)
+
+  const savedDestinationIds = useTravelStore((state) => state.savedDestinationIds)
+  const toggleSaveDestination = useTravelStore((state) => state.toggleSaveDestination)
+
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
   if (!destination) {
     return (
@@ -44,14 +77,16 @@ export default function DestinationDetailPage() {
     )
   }
 
+  const isSaved = mounted ? savedDestinationIds.includes(destination.id) : false
+
   const handleShare = () => {
-    if (navigator.share) {
+    if (typeof window !== "undefined" && navigator.share) {
       navigator.share({
         title: `${destination.name} — ROVEO`,
         text: destination.description,
         url: window.location.href,
       }).catch(() => {})
-    } else {
+    } else if (typeof window !== "undefined") {
       navigator.clipboard.writeText(window.location.href)
       toast({
         title: "Link Copied",
@@ -61,12 +96,23 @@ export default function DestinationDetailPage() {
   }
 
   const handleToggleSave = () => {
-    setIsSaved(!isSaved)
+    const nowSaved = toggleSaveDestination(destination.id)
     toast({
-      title: !isSaved ? "Saved to Travel Desk" : "Removed from Travel Desk",
-      description: `${destination.name} is ${!isSaved ? "saved" : "removed"}.`,
+      title: nowSaved ? "Saved to Travel Desk" : "Removed from Travel Desk",
+      description: `${destination.name} is ${nowSaved ? "saved" : "removed"}.`,
     })
   }
+
+  const coords = DESTINATION_COORDINATES[destination.id] || [35.0116, 135.7681]
+  const mapPoints: MapPoint[] = [
+    {
+      id: destination.id,
+      title: `${destination.name}, ${destination.country}`,
+      lat: coords[0],
+      lng: coords[1],
+      category: destination.category,
+    },
+  ]
 
   return (
     <div className="space-y-10 animate-in fade-in duration-500 max-w-5xl mx-auto">
@@ -144,7 +190,7 @@ export default function DestinationDetailPage() {
 
       {/* Main Editorial Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-        {/* Left Column: Narrative & Highlights */}
+        {/* Left Column: Narrative, Highlights & Map */}
         <div className="lg:col-span-8 space-y-10">
           <div className="space-y-3">
             <span className="editorial-tag">Overview</span>
@@ -170,6 +216,23 @@ export default function DestinationDetailPage() {
                 </div>
               ))}
             </div>
+          </div>
+
+          {/* Topographic & Regional Map */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="editorial-tag">Geographic Position</span>
+              <span className="text-xs text-[#78848C] flex items-center gap-1">
+                <Navigation className="w-3.5 h-3.5 text-[#6D9D94]" />
+                <span>{coords[0].toFixed(4)}° N, {coords[1].toFixed(4)}° E</span>
+              </span>
+            </div>
+            <TripMap
+              points={mapPoints}
+              center={coords}
+              zoom={11}
+              className="h-[320px] sm:h-[380px] w-full rounded-3xl overflow-hidden border border-black/[0.08] dark:border-white/[0.08] shadow-sm"
+            />
           </div>
         </div>
 
@@ -212,7 +275,7 @@ export default function DestinationDetailPage() {
             {/* CTAs */}
             <div className="space-y-2.5 pt-2">
               <Link
-                href={`/ai-planner?destination=${encodeURIComponent(destination.name)}`}
+                href={`/ai-planner?destination=${encodeURIComponent(destination.name + ', ' + destination.country)}`}
                 className="w-full block"
               >
                 <Button className="w-full rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] hover:bg-[#172B3A] dark:hover:bg-[#8eb8a7] text-white dark:text-[#101E2B] font-semibold py-6 text-xs gap-2 shadow-md">
@@ -222,7 +285,7 @@ export default function DestinationDetailPage() {
               </Link>
 
               <Link
-                href={`/manual-planner?destination=${encodeURIComponent(destination.name)}`}
+                href={`/manual-planner?destination=${encodeURIComponent(destination.name + ', ' + destination.country)}`}
                 className="w-full block"
               >
                 <Button variant="outline" className="w-full rounded-full border-black/15 dark:border-white/20 py-6 text-xs font-semibold">

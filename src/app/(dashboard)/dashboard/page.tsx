@@ -15,54 +15,67 @@ import {
   Globe,
   Sliders,
   ArrowUpRight,
+  Plane,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { DESTINATIONS } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
+import { useTravelStore } from "@/lib/store/travel-store"
 
 export default function DashboardPage() {
-  const user = {
-    name: "Alexandra",
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&q=80",
-    tier: "Passport Member",
-    upcomingTripsCount: 2,
-    savedPlacesCount: 7,
-  }
+  const user = useTravelStore((state) => state.user)
+  const trips = useTravelStore((state) => state.trips)
+  const savedDestinationIds = useTravelStore((state) => state.savedDestinationIds)
 
-  const activeJourney = {
-    id: "trip-kyoto-2026",
-    title: "Autumn Serenity in Kyoto",
-    destination: "Kyoto, Japan",
-    dates: "Nov 15 — Nov 22, 2026",
-    daysCount: 7,
-    status: "Upcoming",
-    planningMode: "AI Architecture",
-    coverImage: "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&q=80",
-    progressPercent: 85,
-    summary: "Machiya stay in historic Gion, dawn bamboo walks, and Zen garden meditation circuits.",
-  }
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
 
-  const savedHighlights = DESTINATIONS.slice(0, 3)
+  const upcomingTrips = React.useMemo(() => {
+    if (!mounted) return []
+    return trips.filter((t) => t.status === "upcoming" || t.status === "planning")
+  }, [mounted, trips])
+
+  const activeJourney = React.useMemo(() => {
+    if (!mounted || trips.length === 0) return null
+    return (
+      trips.find((t) => t.status === "upcoming") ||
+      trips.find((t) => t.status === "planning") ||
+      trips[0]
+    )
+  }, [mounted, trips])
+
+  const savedHighlights = React.useMemo(() => {
+    if (!mounted) return []
+    return DESTINATIONS.filter((d) => savedDestinationIds.includes(d.id)).slice(0, 3)
+  }, [mounted, savedDestinationIds])
 
   return (
     <div className="space-y-12 animate-in fade-in duration-500 max-w-6xl mx-auto">
       {/* ─── 1. Editorial Welcome & Traveler Status ────────────────────────── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-black/[0.08] dark:border-white/[0.08]">
         <div className="flex items-center gap-4 sm:gap-5">
-          <div className="relative w-16 h-16 rounded-full overflow-hidden border border-black/10 dark:border-white/20 shrink-0 shadow-sm">
-            <Image
-              src={user.avatar}
-              alt={user.name}
-              fill
-              className="object-cover"
-            />
+          <div className="relative w-16 h-16 rounded-full overflow-hidden border border-black/10 dark:border-white/20 shrink-0 shadow-sm bg-[#101E2B]/10 dark:bg-white/10 flex items-center justify-center">
+            {user.avatarUrl ? (
+              <Image
+                src={user.avatarUrl}
+                alt={user.fullName || "User"}
+                fill
+                className="object-cover"
+              />
+            ) : (
+              <span className="font-display font-bold text-xl text-[#101E2B] dark:text-[#F8F7F4]">
+                {user.fullName ? user.fullName.charAt(0).toUpperCase() : "R"}
+              </span>
+            )}
           </div>
           <div className="space-y-0.5">
             <span className="editorial-tag text-[#6D9D94]">
-              {user.tier} • Active Travel Desk
+              {user.tier || "Passport Member"} • Active Travel Desk
             </span>
             <h1 className="font-display text-2xl sm:text-4xl font-bold tracking-tight text-[#18232D] dark:text-[#F8F7F4]">
-              Welcome back, {user.name}
+              Welcome back, {user.fullName ? user.fullName.split(" ")[0] : "Traveler"}
             </h1>
             <p className="text-xs sm:text-sm text-[#78848C]">
               Your journey. Your rules. Your world.
@@ -99,63 +112,87 @@ export default function DashboardPage() {
             href="/trips"
             className="text-xs font-semibold text-[#6D9D94] hover:text-[#101E2B] dark:hover:text-[#F8F7F4] transition-colors"
           >
-            All Saved Journeys ({user.upcomingTripsCount}) →
+            All Saved Journeys ({mounted ? trips.length : "..."}) →
           </Link>
         </div>
 
-        {/* Cinematic Journey Spotlight Card */}
-        <Link
-          href={`/trips/${activeJourney.id}`}
-          className="group block relative rounded-3xl overflow-hidden bg-[#101E2B] text-white shadow-xl transition-all duration-500 hover:shadow-2xl"
-        >
-          <div className="grid grid-cols-1 md:grid-cols-12 items-stretch">
-            {/* Image Canvas */}
-            <div className="md:col-span-5 relative aspect-[16/10] md:aspect-auto w-full min-h-[260px] overflow-hidden">
-              <Image
-                src={activeJourney.coverImage}
-                alt={activeJourney.title}
-                fill
-                className="object-cover transition-transform duration-700 group-hover:scale-105"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#101E2B] via-transparent to-transparent opacity-80" />
+        {activeJourney ? (
+          /* Cinematic Journey Spotlight Card */
+          <Link
+            href={`/trips/${activeJourney.id}`}
+            className="group block relative rounded-3xl overflow-hidden bg-[#101E2B] text-white shadow-xl transition-all duration-500 hover:shadow-2xl"
+          >
+            <div className="grid grid-cols-1 md:grid-cols-12 items-stretch">
+              {/* Image Canvas */}
+              <div className="md:col-span-5 relative aspect-[16/10] md:aspect-auto w-full min-h-[260px] overflow-hidden">
+                <Image
+                  src={activeJourney.coverImage || "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1200&q=80"}
+                  alt={activeJourney.title}
+                  fill
+                  className="object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t md:bg-gradient-to-r from-[#101E2B] via-transparent to-transparent opacity-80" />
+              </div>
+
+              {/* Details Panel */}
+              <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#A5C7BA]">
+                      {activeJourney.status}
+                    </span>
+                    <span className="text-xs text-white/50">•</span>
+                    <span className="text-xs text-white/70 font-medium">{activeJourney.planningMode}</span>
+                  </div>
+
+                  <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#A5C7BA] transition-colors">
+                    {activeJourney.title}
+                  </h3>
+
+                  <p className="text-xs sm:text-sm text-white/70 leading-relaxed font-normal">
+                    {activeJourney.notes || `Curated itinerary covering ${activeJourney.destination} across ${activeJourney.days?.length || activeJourney.daysCount} planned days.`}
+                  </p>
+                </div>
+
+                {/* Progress & Metadata */}
+                <div className="pt-4 border-t border-white/[0.1] space-y-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80">
+                    <span className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-[#A5C7BA]" />
+                      {activeJourney.dates}
+                    </span>
+                    <span className="font-semibold text-[#A5C7BA] flex items-center gap-1">
+                      <span>View Master Blueprint</span>
+                      <ArrowUpRight className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            {/* Details Panel */}
-            <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between space-y-4">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="glass-pill px-3 py-1 rounded-full text-[10px] uppercase font-bold tracking-widest text-[#A5C7BA]">
-                    {activeJourney.status}
-                  </span>
-                  <span className="text-xs text-white/50">•</span>
-                  <span className="text-xs text-white/70 font-medium">{activeJourney.planningMode}</span>
-                </div>
-
-                <h3 className="font-display text-2xl sm:text-3xl font-bold tracking-tight text-white group-hover:text-[#A5C7BA] transition-colors">
-                  {activeJourney.title}
-                </h3>
-
-                <p className="text-xs sm:text-sm text-white/70 leading-relaxed font-normal">
-                  {activeJourney.summary}
-                </p>
-              </div>
-
-              {/* Progress & Metadata */}
-              <div className="pt-4 border-t border-white/[0.1] space-y-2">
-                <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-white/80">
-                  <span className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-[#A5C7BA]" />
-                    {activeJourney.dates}
-                  </span>
-                  <span className="font-semibold text-[#A5C7BA] flex items-center gap-1">
-                    <span>Itinerary Blueprint Ready</span>
-                    <ArrowUpRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </div>
+          </Link>
+        ) : (
+          <div className="p-8 sm:p-12 glass-dock rounded-3xl border border-black/[0.08] dark:border-white/[0.08] text-center space-y-4 max-w-lg mx-auto">
+            <Plane className="w-10 h-10 text-[#6D9D94] mx-auto stroke-1" />
+            <h3 className="font-display text-2xl font-bold text-[#18232D] dark:text-[#F8F7F4]">
+              Ready for your next journey?
+            </h3>
+            <p className="text-xs text-[#78848C]">
+              Your travel desk is currently clear. Use our AI Travel Studio to synthesize a full multi-day itinerary in seconds, or craft one by hand.
+            </p>
+            <div className="pt-2 flex items-center justify-center gap-3">
+              <Link href="/ai-planner">
+                <Button className="rounded-full bg-[#101E2B] dark:bg-[#A5C7BA] text-white dark:text-[#101E2B] text-xs px-5">
+                  Launch AI Studio
+                </Button>
+              </Link>
+              <Link href="/manual-planner">
+                <Button variant="outline" className="rounded-full text-xs px-5">
+                  Manual Builder
+                </Button>
+              </Link>
             </div>
           </div>
-        </Link>
+        )}
       </div>
 
       {/* ─── 3. Saved Destinations: Thematic Visual Strip ─────────────────── */}
@@ -171,20 +208,35 @@ export default function DashboardPage() {
             href="/saved"
             className="text-xs font-semibold text-[#6D9D94] hover:text-[#101E2B] dark:hover:text-[#F8F7F4] transition-colors"
           >
-            View All Saved ({user.savedPlacesCount}) →
+            View All Saved ({mounted ? savedDestinationIds.length : "..."}) →
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-          {savedHighlights.map((dest) => (
-            <DestinationCard
-              key={dest.id}
-              destination={dest}
-              isSaved={true}
-              variant="portrait"
-            />
-          ))}
-        </div>
+        {savedHighlights.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
+            {savedHighlights.map((dest) => (
+              <DestinationCard
+                key={dest.id}
+                destination={dest}
+                isSaved={true}
+                variant="portrait"
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="p-8 glass-dock rounded-3xl border border-black/[0.08] dark:border-white/[0.08] text-center space-y-3">
+            <Bookmark className="w-8 h-8 text-[#78848C] mx-auto stroke-1" />
+            <h4 className="font-display font-bold text-base">No destinations saved yet</h4>
+            <p className="text-xs text-[#78848C] max-w-sm mx-auto">
+              Explore the global atlas and save places you would like to incorporate into future trips.
+            </p>
+            <Link href="/destinations" className="inline-block pt-1">
+              <Button variant="outline" size="sm" className="rounded-full text-xs">
+                Explore Atlas
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
     </div>
   )

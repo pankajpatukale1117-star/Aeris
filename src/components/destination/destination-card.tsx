@@ -6,6 +6,7 @@ import Image from "next/image"
 import { Bookmark, Star, MapPin, ArrowUpRight } from "lucide-react"
 import { Destination } from "@/lib/constants"
 import { useToast } from "@/hooks/use-toast"
+import { useTravelStore } from "@/lib/store/travel-store"
 
 interface DestinationCardProps {
   destination: Destination
@@ -17,22 +18,32 @@ interface DestinationCardProps {
 export function DestinationCard({
   destination,
   onSave,
-  isSaved: initialSaved = false,
+  isSaved: propSaved,
   variant = "portrait",
 }: DestinationCardProps) {
-  const [saved, setSaved] = React.useState(initialSaved)
   const { toast } = useToast()
+  const savedDestinationIds = useTravelStore((state) => state.savedDestinationIds)
+  const toggleSaveDestination = useTravelStore((state) => state.toggleSaveDestination)
+
+  const [mounted, setMounted] = React.useState(false)
+  React.useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  const isSaved = mounted
+    ? savedDestinationIds.includes(destination.id)
+    : propSaved ?? false
 
   const handleToggleSave = (e: React.MouseEvent) => {
     e.preventDefault()
     e.stopPropagation()
-    const nextSaved = !saved
-    setSaved(nextSaved)
+
+    const nowSaved = toggleSaveDestination(destination.id)
     if (onSave) onSave(destination.id)
 
     toast({
-      title: nextSaved ? "Saved to your Travel Desk" : "Removed from Travel Desk",
-      description: `${destination.name}, ${destination.country} is ${nextSaved ? "saved" : "removed"}.`,
+      title: nowSaved ? "Saved to your Travel Desk" : "Removed from Travel Desk",
+      description: `${destination.name}, ${destination.country} is ${nowSaved ? "saved" : "removed"}.`,
     })
   }
 
@@ -74,7 +85,7 @@ export function DestinationCard({
           >
             <Bookmark
               className={`w-4 h-4 transition-colors ${
-                saved ? "fill-[#A5C7BA] text-[#A5C7BA]" : ""
+                isSaved ? "fill-[#A5C7BA] text-[#A5C7BA]" : "text-white"
               }`}
             />
           </button>
@@ -100,18 +111,15 @@ export function DestinationCard({
             </div>
           </div>
 
-          {/* Short Editorial Line */}
-          <p className="text-xs text-[#F8F7F4]/75 line-clamp-2 font-normal leading-relaxed pt-0.5">
+          {/* Highlights summary */}
+          <p className="text-xs text-[#F8F7F4]/75 line-clamp-2 leading-relaxed">
             {destination.description}
           </p>
 
-          {/* Bottom Micro Details */}
-          <div className="pt-2 flex items-center justify-between text-[11px] text-[#A5C7BA]/80 border-t border-white/[0.12]">
+          {/* Bottom Bar: Duration & Budget */}
+          <div className="pt-3 border-t border-white/[0.1] flex items-center justify-between text-[11px] text-[#A5C7BA] font-medium">
             <span>{destination.recommendedDuration}</span>
-            <span className="inline-flex items-center gap-1 text-white font-medium group-hover:translate-x-0.5 transition-transform">
-              <span>Explore</span>
-              <ArrowUpRight className="w-3.5 h-3.5 text-[#6D9D94]" />
-            </span>
+            <span className="text-white/90 font-semibold">{destination.approximateBudget}</span>
           </div>
         </div>
       </div>

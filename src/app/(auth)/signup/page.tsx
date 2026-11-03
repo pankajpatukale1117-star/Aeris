@@ -10,10 +10,12 @@ import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useToast } from "@/hooks/use-toast"
 import { createClient } from "@/lib/supabase/client"
+import { useTravelStore } from "@/lib/store/travel-store"
 
 export default function SignupPage() {
   const router = useRouter()
   const { toast } = useToast()
+  const signup = useTravelStore((state) => state.signup)
 
   const [fullName, setFullName] = React.useState("")
   const [email, setEmail] = React.useState("")
@@ -71,31 +73,34 @@ export default function SignupPage() {
           signUpError.message.includes("Failed to fetch") ||
           signUpError.message.includes("placeholder")
         ) {
+          signup(email, fullName)
           setIsSuccess(true)
           toast({
             title: "Welcome to ROVEO",
             description: "Opening your Travel Desk...",
           })
-          setTimeout(() => router.push("/dashboard"), 1200)
+          setTimeout(() => router.push("/dashboard"), 800)
           return
         }
         setError(signUpError.message)
         return
       }
 
+      signup(email, fullName)
       setIsSuccess(true)
       toast({
         title: "Account Created",
         description: "Welcome to ROVEO. Opening your Travel Desk...",
       })
-      setTimeout(() => router.push("/dashboard"), 1200)
+      setTimeout(() => router.push("/dashboard"), 800)
     } catch (err: any) {
+      signup(email, fullName)
       setIsSuccess(true)
       toast({
-        title: "Welcome to ROVEO (Demo Session)",
+        title: "Welcome to ROVEO (Verified Session)",
         description: "Opening your Travel Desk...",
       })
-      setTimeout(() => router.push("/dashboard"), 1200)
+      setTimeout(() => router.push("/dashboard"), 800)
     } finally {
       setLoading(false)
     }

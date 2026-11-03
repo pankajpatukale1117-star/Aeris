@@ -21,6 +21,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { ActivityCard, ActivityItem } from "@/components/trip/activity-card"
 import { useToast } from "@/hooks/use-toast"
+import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
+import { DESTINATIONS } from "@/lib/constants"
 
 interface ManualDay {
   dayNumber: number
@@ -32,6 +34,7 @@ function ManualPlannerContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
+  const addTrip = useTravelStore((state) => state.addTrip)
 
   const prefillDestination = searchParams.get("destination") || "Amalfi Coast, Italy"
 
@@ -168,11 +171,55 @@ function ManualPlannerContent() {
   }
 
   const handleSaveTrip = () => {
+    const matchedDest = DESTINATIONS.find(
+      (d) =>
+        d.name.toLowerCase() === destination.toLowerCase() ||
+        destination.toLowerCase().includes(d.name.toLowerCase())
+    )
+    const coverImage = matchedDest
+      ? matchedDest.image
+      : "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80"
+
+    const newTripId = `trip-${Date.now()}`
+    const newTrip: StoredTrip = {
+      id: newTripId,
+      title: tripTitle || `Journey to ${destination}`,
+      destination: destination,
+      dates: `${startDate} — ${endDate}`,
+      startDate: startDate,
+      endDate: endDate,
+      daysCount: days.length,
+      travelers: 2,
+      budget: budget ? `$${budget}` : undefined,
+      status: "planning",
+      planningMode: "Manual Studio",
+      coverImage: coverImage,
+      notes: notes,
+      coordinates: [40.6340, 14.6027],
+      days: days.map((d) => ({
+        dayNumber: d.dayNumber,
+        title: d.title,
+        activities: d.activities.map((a) => ({
+          id: a.id,
+          time: a.time,
+          title: a.title,
+          description: a.description,
+          location: a.location,
+          duration: a.duration,
+          estimatedCost: a.estimatedCost,
+          category: a.category,
+        })),
+      })),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    addTrip(newTrip)
     toast({
-      title: "Itinerary Stored",
-      description: `"${tripTitle}" has been saved to your account.`,
+      title: "Journey Created & Saved",
+      description: `"${newTrip.title}" has been saved to your travel archive.`,
     })
-    router.push("/trips")
+    router.push(`/trips/${newTrip.id}`)
   }
 
   return (

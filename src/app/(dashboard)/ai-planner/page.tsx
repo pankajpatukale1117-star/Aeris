@@ -22,6 +22,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ItineraryTimeline } from "@/components/trip/itinerary-timeline"
 import { useToast } from "@/hooks/use-toast"
+import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
+import { DESTINATIONS } from "@/lib/constants"
 
 const INTEREST_OPTIONS = [
   "Adventure",
@@ -53,6 +55,7 @@ function AIPlannerContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
+  const addTrip = useTravelStore((state) => state.addTrip)
 
   const prefillDestination = searchParams.get("destination") || ""
 
@@ -175,11 +178,61 @@ function AIPlannerContent() {
   }
 
   const handleSaveTrip = () => {
+    if (!itinerary) return
+
+    const matchedDest = DESTINATIONS.find(
+      (d) =>
+        d.name.toLowerCase() === destination.toLowerCase() ||
+        destination.toLowerCase().includes(d.name.toLowerCase()) ||
+        (itinerary.destination && d.name.toLowerCase().includes(itinerary.destination.toLowerCase()))
+    )
+
+    const coverImage = matchedDest
+      ? matchedDest.image
+      : "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=1600&q=80"
+
+    const newTripId = `trip-ai-${Date.now()}`
+    const newTrip: StoredTrip = {
+      id: newTripId,
+      title: itinerary.title || `Curated Journey to ${destination}`,
+      destination: destination,
+      dates: `${departureDate} — ${returnDate}`,
+      startDate: departureDate,
+      endDate: returnDate,
+      daysCount: itinerary.days?.length || 7,
+      travelers: travelers,
+      budget: itinerary.estimatedBudget || undefined,
+      status: "upcoming",
+      planningMode: "AI Architecture",
+      coverImage: coverImage,
+      notes: itinerary.travelTips ? itinerary.travelTips.join("\n• ") : itinerary.overview,
+      coordinates: [35.0116, 135.7681],
+      days: (itinerary.days || []).map((d: any, idx: number) => ({
+        dayNumber: d.dayNumber || idx + 1,
+        date: d.date || `Day ${d.dayNumber || idx + 1}`,
+        title: d.title || `Day ${idx + 1} Program`,
+        description: d.description || "",
+        activities: (d.activities || []).map((a: any, actIdx: number) => ({
+          id: a.id || `act-ai-${idx}-${actIdx}-${Date.now()}`,
+          time: a.time || "10:00",
+          title: a.title,
+          description: a.description || "",
+          location: a.location || destination,
+          duration: a.duration || "1.5h",
+          estimatedCost: a.estimatedCost || "Free",
+          category: a.category || "Sightseeing",
+        })),
+      })),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }
+
+    addTrip(newTrip)
     toast({
-      title: "Saved to Your Archive",
-      description: `"${itinerary?.title}" is safely stored in My Trips.`,
+      title: "Synthesized Itinerary Stored",
+      description: `"${newTrip.title}" has been saved to your Travel Desk.`,
     })
-    router.push("/trips")
+    router.push(`/trips/${newTrip.id}`)
   }
 
   return (
