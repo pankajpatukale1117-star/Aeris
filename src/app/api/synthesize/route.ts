@@ -42,12 +42,12 @@ export async function POST(request: Request) {
       apiKey: clientKey,
     } = body
 
-    // 1. Resolve API Key from Header, Body, or Environment
+    // 1. Resolve API Key from Environment, Header, or Body
     const headerKey = request.headers.get("x-gemini-key")
     const activeKey =
+      process.env.GEMINI_API_KEY ||
       clientKey ||
       headerKey ||
-      process.env.GEMINI_API_KEY ||
       process.env.NEXT_PUBLIC_GEMINI_API_KEY ||
       ""
 
@@ -232,3 +232,4 @@ function generateEditorialSanctuaryFallback(
     days: generatedDays,
   }
 }
+

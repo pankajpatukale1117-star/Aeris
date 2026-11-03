@@ -234,24 +234,15 @@ function AIPlannerContent() {
           </p>
         </div>
 
-        {/* Live Gemini Status Indicator */}
+        {/* Quick Action Navigation */}
         <div className="flex flex-wrap items-center gap-3 relative z-10">
-          <button
-            onClick={openModal}
-            className="glass-pill px-4 py-2.5 text-xs font-medium text-slate-200 hover:text-white flex items-center gap-2.5 transition-all hover:border-[#38bdf8]/50"
+          <Link
+            href="/destinations"
+            className="glass-pill px-4 py-2.5 text-xs font-medium text-slate-200 hover:text-white flex items-center gap-2 transition-all hover:border-[#38bdf8]/50"
           >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                hasKey
-                  ? "bg-emerald-400 shadow-[0_0_8px_#34d399] animate-pulse"
-                  : "bg-amber-400 shadow-[0_0_8px_#fbbf24]"
-              }`}
-            />
-            <span className="text-[11px] font-semibold text-[#e8d5b5]">
-              {hasKey ? "Gemini 2.5 Active" : "Offline Demo Mode"}
-            </span>
-            <KeyRound className="w-3.5 h-3.5 text-slate-400 ml-1" />
-          </button>
+            <Compass className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span>Browse Atlas</span>
+          </Link>
         </div>
       </div>
 
@@ -400,7 +391,7 @@ function AIPlannerContent() {
               </div>
               <div className="space-y-2">
                 <h3 className="font-editorial text-2xl sm:text-3xl font-medium text-white">
-                  Consulting Google Gemini 2.5...
+                  Synthesizing Bespoke Itinerary...
                 </h3>
                 <p className="text-xs text-slate-300 max-w-md mx-auto leading-relaxed">
                   Synthesizing authentic landmarks, circadian timings, private access tips, and pedestrian proximity for {destination}.
@@ -642,7 +633,7 @@ function AIPlannerContent() {
                   Awaiting Your Sanctuary Coordinates
                 </h3>
                 <p className="text-xs text-slate-400 max-w-md mx-auto leading-relaxed">
-                  Select any city or global territory on the left and tap "Synthesize Bespoke Flow" to generate a live itinerary powered by Google Gemini 2.5.
+                  Select any city or global territory on the left and tap "Synthesize Bespoke Flow" to generate an authentic luxury itinerary.
                 </p>
               </div>
               <button
