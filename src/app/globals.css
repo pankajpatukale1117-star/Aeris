@@ -253,7 +253,7 @@ button {
   box-shadow: 0 14px 32px rgba(232, 213, 181, 0.44), inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
 }
 
-/* ─── 60fps Spring Animations ────────────────────────────────────────────── */
+/* ─── 60fps Spring Animations & Shimmer Skeleton ────────────────────────── */
 @keyframes revealUp {
   0% { opacity: 0; transform: translate3d(0, 14px, 0) scale(0.99); }
   100% { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
@@ -261,6 +261,17 @@ button {
 
 .animate-reveal {
   animation: revealUp 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes shimmerWave {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.shimmer-skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.03) 75%);
+  background-size: 200% 100%;
+  animation: shimmerWave 1.8s infinite;
 }
 
 /* ─── Strict Image Containment Guarantee (Rule 2) ────────────────────────── */
