@@ -67,6 +67,7 @@ export default function RootLayout({
                         500: '#d4b483',
                       },
                       cyanLuxe: '#38bdf8',
+                      emeraldLuxe: '#34d399',
                     },
                     fontFamily: {
                       editorial: ['"Cormorant Garamond"', 'Georgia', 'serif'],
@@ -80,9 +81,12 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased bg-[#050a10] text-[#f1f5f9] min-h-screen flex flex-col selection:bg-[#e8d5b5]/30 selection:text-white relative overflow-x-hidden">
-        {/* Ambient Blurred Aurora Orbs */}
-        <div className="aurora-orb aurora-cyan w-[30rem] h-[30rem] -top-24 -left-24 fixed pointer-events-none" />
-        <div className="aurora-orb aurora-champagne w-[30rem] h-[30rem] top-1/2 -right-24 fixed pointer-events-none" />
+        {/* 3 Fixed Ambient Aurora Orbs (60fps GPU Accelerated Soft Radial Gradients) */}
+        <div className="aurora-container" aria-hidden="true">
+          <div className="aurora-champagne" />
+          <div className="aurora-sky" />
+          <div className="aurora-emerald" />
+        </div>
 
         <ThemeProvider
           attribute="class"

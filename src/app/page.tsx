@@ -501,10 +501,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ─── AMBIENT AURORA ORBS ────────────────────────────────────────── */}
-      <div className="aurora-orb aurora-cyan w-[32rem] h-[32rem] top-[20%] -left-36 pointer-events-none" />
-      <div className="aurora-orb aurora-champagne w-[32rem] h-[32rem] top-[60%] -right-36 pointer-events-none" />
-
       {/* ─── FOOTER & MOBILE DOCK ─────────────────────────────────────────── */}
       <Footer />
       <MobileNav />

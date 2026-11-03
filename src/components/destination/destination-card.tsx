@@ -53,7 +53,7 @@ export function DestinationCard({
       className="group relative block rounded-3xl overflow-hidden glass-card transition-all duration-500 hover:shadow-2xl"
     >
       {/* Strict Image Containment Container: Bounded relative h-56 w-full overflow-hidden */}
-      <div className="relative h-56 sm:h-64 w-full overflow-hidden">
+      <div className="relative h-56 w-full overflow-hidden">
         <Image
           src={destination.image}
           alt={destination.name}

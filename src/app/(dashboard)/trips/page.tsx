@@ -108,7 +108,7 @@ export default function TripsPage() {
             >
               <div>
                 {/* Strict Image Containment Container (Rule 2) */}
-                <div className="relative h-56 sm:h-60 w-full overflow-hidden">
+                <div className="relative h-56 w-full overflow-hidden">
                   <Image
                     src={trip.coverImage || "https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?w=800&q=80"}
                     alt={trip.title}
