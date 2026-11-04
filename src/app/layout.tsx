@@ -48,38 +48,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;0,700;1,500;1,600;1,700&family=Inter:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap"
           rel="stylesheet"
         />
-        {/* Leaflet CSS loaded via CDN to avoid PostCSS subprocess bottlenecks */}
+        {/* Leaflet CSS */}
         <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-        {/* Tailwind CDN as guaranteed fallback anti-breakage safeguard */}
-        <script src="https://cdn.tailwindcss.com"></script>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              tailwind.config = {
-                darkMode: 'class',
-                theme: {
-                  extend: {
-                    colors: {
-                      background: '#050a10',
-                      foreground: '#f1f5f9',
-                      champagne: {
-                        300: '#f3e8d2',
-                        400: '#e8d5b5',
-                        500: '#d4b483',
-                      },
-                      cyanLuxe: '#38bdf8',
-                      emeraldLuxe: '#34d399',
-                    },
-                    fontFamily: {
-                      editorial: ['"Cormorant Garamond"', 'Georgia', 'serif'],
-                      sans: ['"Inter"', 'system-ui', 'sans-serif'],
-                    }
-                  }
-                }
-              }
-            `,
-          }}
-        />
       </head>
       <body className="font-sans antialiased bg-[#050a10] text-[#f1f5f9] min-h-screen flex flex-col selection:bg-[#e8d5b5]/30 selection:text-white relative overflow-x-hidden">
         {/* 3 Fixed Ambient Aurora Orbs (60fps GPU Accelerated Soft Radial Gradients) */}

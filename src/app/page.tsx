@@ -115,6 +115,11 @@ export default function HomePage() {
                   placeholder="Kyoto, Amalfi, Patagonia..."
                   value={destinationQuery}
                   onChange={(e) => setDestinationQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      router.push(`/destinations?query=${encodeURIComponent(destinationQuery.trim() || "All")}`)
+                    }
+                  }}
                   className="w-full bg-transparent text-sm font-semibold text-[#f1f5f9] placeholder-[#94a3b8]/60 focus:outline-none pt-0.5 border-none"
                 />
               </div>
@@ -151,7 +156,7 @@ export default function HomePage() {
               {/* Search Trigger */}
               <div className="sm:col-span-2">
                 <Link
-                  href={`/destinations?query=${encodeURIComponent(destinationQuery || "All")}`}
+                  href={`/destinations?query=${encodeURIComponent(destinationQuery.trim() || "All")}`}
                   className="w-full block"
                 >
                   <button className="w-full btn-luxe py-3.5 text-xs font-semibold gap-1.5 shadow-lg cursor-pointer">

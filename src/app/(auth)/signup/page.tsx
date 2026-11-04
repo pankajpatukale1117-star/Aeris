@@ -86,14 +86,14 @@ export default function SignupPage() {
       setIsSuccess(true)
       toast({
         title: "Account Created",
-        description: "Welcome to AERIS. Opening your Travel Desk...",
+        description: "Welcome to ROVEO. Opening your Travel Desk...",
       })
       setTimeout(() => router.push("/dashboard"), 800)
     } catch (err: any) {
       signup(email, fullName)
       setIsSuccess(true)
       toast({
-        title: "Welcome to AERIS",
+        title: "Welcome to ROVEO",
         description: "Opening your Travel Desk...",
       })
       setTimeout(() => router.push("/dashboard"), 800)
@@ -115,7 +115,7 @@ export default function SignupPage() {
           Begin Your <span className="italic text-[#e8d5b5]">Odyssey</span>
         </h1>
         <p className="text-xs text-slate-300 max-w-xs mx-auto font-light leading-relaxed">
-          Create your private AERIS registry to craft autonomous itineraries and bookmark global sanctuaries.
+          Create your private ROVEO registry to craft autonomous itineraries and bookmark global sanctuaries.
         </p>
       </div>
 
