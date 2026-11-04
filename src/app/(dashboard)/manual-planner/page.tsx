@@ -29,6 +29,8 @@ import {
   Loader2,
   CalendarDays,
   Calculator,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import {
   ActivityCard,
@@ -307,6 +309,12 @@ function ManualPlannerContent() {
   // AI Suggest Activity State (Requirement 9)
   const [isSuggesting, setIsSuggesting] = React.useState(false)
 
+  // Simplified UI Toggles
+  const [isSettingsOpen, setIsSettingsOpen] = React.useState(false)
+  const [isBudgetExpanded, setIsBudgetExpanded] = React.useState(false)
+  const [showMoreAddFields, setShowMoreAddFields] = React.useState(false)
+  const [showMoreEditFields, setShowMoreEditFields] = React.useState(false)
+
   // Interactive Trip Financial Calculator State
   const [isCalcOpen, setIsCalcOpen] = React.useState(false)
   const [calcTargetMode, setCalcTargetMode] = React.useState<"activity_new" | "activity_edit" | "budget">("activity_new")
@@ -444,6 +452,7 @@ function ManualPlannerContent() {
     setNewActStartTime("10:00")
     setNewActEndTime("11:30")
     setIsAddingActivity(false)
+    setShowMoreAddFields(false)
 
     toast({
       title: "Experience Saved",
@@ -484,6 +493,7 @@ function ManualPlannerContent() {
     setEditCost(rawCost === "0" || String(act.estimatedCost).toLowerCase() === "free" ? "" : rawCost)
     setEditCat(act.category || "Sightseeing")
     setEditDuration(act.duration || "1.5h")
+    setShowMoreEditFields(false)
   }
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -523,6 +533,7 @@ function ManualPlannerContent() {
     )
 
     setEditingActId(null)
+    setShowMoreEditFields(false)
     toast({
       title: "Experience Updated",
       description: `"${editTitle}" updated in Day ${activeDayNumber}.`,
@@ -720,39 +731,58 @@ function ManualPlannerContent() {
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto pb-24">
-      {/* ─── 1. TOP EDITORIAL HEADER & CONTROLS ───────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/[0.08]">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2">
-            <span className="editorial-tag text-[#e8d5b5]">Custom Studio</span>
+    <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24 px-3 sm:px-0">
+      {/* ─── 1. TOP HEADER & QUICK CONTROLS ──────────────────────────────── */}
+      <div className="glass-shell p-5 sm:p-6 rounded-3xl border border-white/15 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5 flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="editorial-tag text-[#e8d5b5]">Trip Planner</span>
             {hasAutoSaved && (
-              <span className="text-[10px] text-emerald-400/90 font-mono flex items-center gap-1">
+              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 glass-pill px-2 py-0.5 rounded-full">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Draft Auto-saved
+                Auto-saved
               </span>
             )}
           </div>
-          <h1 className="font-editorial text-3xl sm:text-5xl font-bold tracking-tight text-[#f1f5f9]">
-            Manual Trip Builder
-          </h1>
-          <p className="text-xs sm:text-sm text-[#94a3b8]">
-            Total autonomy over every hour, stop, reservation, and expenditure.
-          </p>
+
+          <div className="flex items-center gap-2">
+            <h1 className="font-editorial text-2xl sm:text-4xl font-bold tracking-tight text-white truncate">
+              {tripTitle || "Custom Itinerary"}
+            </h1>
+            <button
+              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-[#38bdf8] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+              title="Edit Trip Details"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs text-slate-300 flex-wrap">
+            <span className="flex items-center gap-1 text-[#38bdf8] font-medium">
+              <MapPin className="w-3.5 h-3.5" />
+              {destination || "Set destination"}
+            </span>
+            <span className="text-white/20">•</span>
+            <span className="flex items-center gap-1 text-slate-300">
+              <Calendar className="w-3.5 h-3.5 text-[#e8d5b5]" />
+              {formatDisplayDate(startDate)} — {formatDisplayDate(computedEndDate)} ({days.length} Days)
+            </span>
+          </div>
         </div>
 
-        {/* Currency Switcher & Action Controls */}
-        <div className="flex flex-wrap items-center gap-2.5">
-          {/* Currency Switcher (Requirement 3) */}
-          <div className="flex items-center glass-pill rounded-full p-1 border border-white/10">
+        {/* Action Controls */}
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          {/* Currency Switcher */}
+          <div className="flex items-center glass-pill rounded-full p-0.5 border border-white/10">
             {CURRENCIES.map((c) => (
               <button
                 key={c.code}
                 onClick={() => setCurrency(c.code)}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
                   currency === c.code
-                    ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_10px_rgba(232,213,181,0.4)]"
-                    : "text-slate-300 hover:text-white"
+                    ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_8px_rgba(232,213,181,0.4)]"
+                    : "text-slate-400 hover:text-white"
                 }`}
                 title={`Switch to ${c.label}`}
               >
@@ -761,42 +791,33 @@ function ManualPlannerContent() {
             ))}
           </div>
 
-          {/* Calculator Button */}
+          {/* Edit Trip Details Button */}
           <button
-            type="button"
-            onClick={handleOpenCalcForBudget}
-            className={`glass-pill px-3.5 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isCalcOpen
-                ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]"
-                : "text-slate-200 hover:text-white hover:border-[#38bdf8]/50"
+            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
+            className={`glass-pill px-3 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isSettingsOpen ? "bg-white/20 text-white border-white/40 shadow-sm" : "text-slate-200 hover:text-white"
             }`}
-            title="Open Trip Expense & Split Calculator"
+            title="Edit destination, dates, and target budget"
           >
-            <Calculator className="w-3.5 h-3.5 text-[#38bdf8]" />
-            <span>Calculator</span>
+            <Sliders className="w-3.5 h-3.5 text-[#e8d5b5]" />
+            <span>{isSettingsOpen ? "Hide Settings" : "Trip Details"}</span>
+            {isSettingsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
 
+          {/* Copy Dossier */}
           <button
             onClick={handleCopyItinerary}
-            className="glass-pill px-3.5 py-2 text-xs font-semibold text-slate-200 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer hover:border-white/30"
-            title="Copy Itinerary Dossier"
+            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Copy Itinerary summary"
           >
             <Copy className="w-3.5 h-3.5 text-[#38bdf8]" />
-            <span className="hidden sm:inline">Copy Dossier</span>
+            <span className="hidden sm:inline">Copy</span>
           </button>
 
-          <button
-            onClick={handleResetTemplate}
-            className="glass-pill px-3 py-2 text-xs text-slate-400 hover:text-rose-300 flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Reset to Template"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset</span>
-          </button>
-
+          {/* Save Journey Primary Button */}
           <button
             onClick={handleSaveTrip}
-            className="btn-luxe px-5 py-2 text-xs font-semibold flex items-center gap-2 shadow-xl cursor-pointer"
+            className="btn-luxe px-4 py-2 text-xs font-semibold flex items-center gap-1.5 shadow-lg cursor-pointer"
           >
             <Save className="w-3.5 h-3.5 text-[#050a10]" />
             <span>Save Journey</span>
@@ -804,84 +825,117 @@ function ManualPlannerContent() {
         </div>
       </div>
 
-      {/* ─── 2. TRIP PARAMETERS FORM ───────────────────────────────────────── */}
-      <div className="glass-shell p-6 rounded-3xl border border-white/15 shadow-2xl space-y-4">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <span className="editorial-tag text-[#e8d5b5]">Trip Parameters</span>
-          <span className="text-[10px] font-mono text-slate-400">
-            {days.length} Days • Ends {formatDisplayDate(computedEndDate)}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-          <div className="space-y-1.5">
-            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Trip Title</label>
-            <input
-              value={tripTitle}
-              onChange={(e) => setTripTitle(e.target.value)}
-              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm text-white"
-              placeholder="e.g. Kyoto Zen Retreat"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="editorial-tag text-[9px] text-[#e8d5b5]">Destination</label>
-            <input
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm text-white"
-              placeholder="e.g. Amalfi Coast, Italy"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="editorial-tag text-[9px] text-[#e8d5b5] flex items-center justify-between">
-              <span>Start Date</span>
-              <span className="text-[9px] font-mono text-[#38bdf8]">
-                End: {computedEndDate}
-              </span>
-            </label>
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm text-white cursor-pointer"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <label className="editorial-tag text-[9px] text-[#e8d5b5]">
-                Target Budget ({currentCurrency.symbol})
-              </label>
+      {/* ─── 2. COLLAPSIBLE TRIP DETAILS (Opens smoothly when user wants to edit) ─── */}
+      {isSettingsOpen && (
+        <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-4 animate-reveal bg-[#050a10]/80">
+          <div className="flex items-center justify-between border-b border-white/10 pb-3">
+            <span className="editorial-tag text-[#e8d5b5] flex items-center gap-1.5">
+              <Sliders className="w-3.5 h-3.5 text-[#38bdf8]" />
+              Trip Configuration & Parameters
+            </span>
+            <div className="flex items-center gap-3">
               <button
                 type="button"
-                onClick={handleOpenCalcForBudget}
-                className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
-                title="Calculate target budget"
+                onClick={handleResetTemplate}
+                className="text-xs text-rose-400/80 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                title="Reset to default template"
               >
-                <Calculator className="w-2.5 h-2.5" />
-                <span>Calc</span>
+                <RotateCcw className="w-3 h-3" />
+                <span>Reset Template</span>
+              </button>
+              <button
+                onClick={() => setIsSettingsOpen(false)}
+                className="text-xs text-slate-300 hover:text-white glass-pill px-3 py-1 rounded-full cursor-pointer"
+              >
+                Done ✓
               </button>
             </div>
-            <input
-              type="number"
-              value={budget}
-              onChange={(e) => setBudget(e.target.value)}
-              className="w-full glass-input rounded-2xl h-10 px-3 text-xs sm:text-sm text-white font-mono"
-              placeholder="e.g. 3000"
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+            <div className="space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Trip Title</label>
+              <input
+                value={tripTitle}
+                onChange={(e) => setTripTitle(e.target.value)}
+                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                placeholder="e.g. Kyoto Zen Retreat"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Destination</label>
+              <input
+                value={destination}
+                onChange={(e) => setDestination(e.target.value)}
+                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                placeholder="e.g. Amalfi Coast, Italy"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Start Date</label>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white cursor-pointer"
+              />
+            </div>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                  Budget ({currentCurrency.symbol})
+                </label>
+                <button
+                  type="button"
+                  onClick={handleOpenCalcForBudget}
+                  className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer"
+                >
+                  <Calculator className="w-2.5 h-2.5" />
+                  <span>Calc</span>
+                </button>
+              </div>
+              <input
+                type="number"
+                value={budget}
+                onChange={(e) => setBudget(e.target.value)}
+                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                placeholder="3000"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1 pt-1">
+            <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
+              <FileText className="w-3 h-3 text-[#38bdf8]" />
+              Trip Notes & Reservations
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Record hotel reservations, packing reminders, flight codes..."
+              rows={2}
+              className="w-full glass-input rounded-xl p-3 text-xs text-white"
             />
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ─── 3. LIVE BUDGET TELEMETRY & RUNNING COST CALCULATOR (Requirement 2) ─── */}
-      <div className="glass-shell p-6 rounded-3xl border border-white/15 shadow-2xl space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-[#38bdf8] shadow-[0_0_12px_rgba(56,189,248,0.3)]">
+      {/* ─── 3. SLEEK COMPACT BUDGET BAR (Progress + Quick Stats) ─────────── */}
+      <div className="glass-shell p-4 sm:p-5 rounded-2xl border border-white/15 shadow-lg space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full glass-pill flex items-center justify-center text-[#38bdf8] shrink-0">
               <DollarSign className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="text-xs font-semibold uppercase tracking-widest text-white flex items-center gap-2">
-                <span>Live Budget Telemetry</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs font-semibold text-white">
+                  Planned: <span className="text-[#38bdf8] font-mono">{formatCurrency(totalPlannedCost, currency)}</span>
+                </span>
+                <span className="text-xs text-white/30">•</span>
+                <span className="text-xs text-slate-300">
+                  Target: <span className="font-mono text-white">{formatCurrency(numericTargetBudget, currency)}</span>
+                </span>
                 <span
                   className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
                     remainingBudget < 0
@@ -892,90 +946,52 @@ function ManualPlannerContent() {
                   }`}
                 >
                   {remainingBudget < 0
-                    ? "Over Target"
-                    : budgetUtilization >= 85
-                    ? "Near Limit"
-                    : "On Track"}
+                    ? `${formatCurrency(Math.abs(remainingBudget), currency)} over budget`
+                    : `${formatCurrency(remainingBudget, currency)} remaining`}
                 </span>
-              </h3>
-              <p className="text-[11px] text-slate-400 font-light">
-                Running cost calculated across all {days.length} days and itemized experiences.
-              </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono">
-            <div>
-              <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Planned</span>
-              <span className="text-sm font-bold text-[#38bdf8]">
-                {formatCurrency(totalPlannedCost, currency)}
-              </span>
-            </div>
-            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
-            <div>
-              <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Target</span>
-              <span className="text-sm font-bold text-white">
-                {formatCurrency(numericTargetBudget, currency)}
-              </span>
-            </div>
-            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
-            <div>
-              <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Remaining</span>
-              <span
-                className={`text-sm font-bold ${
-                  remainingBudget < 0
-                    ? "text-rose-400"
-                    : remainingBudget === 0
-                    ? "text-slate-300"
-                    : "text-emerald-400"
-                }`}
-              >
-                {remainingBudget < 0 ? "-" : ""}
-                {formatCurrency(Math.abs(remainingBudget), currency)}
-              </span>
-            </div>
-            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
+          <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={handleOpenCalcForBudget}
-              className="glass-pill px-3 py-1.5 text-xs text-[#e8d5b5] hover:text-white flex items-center gap-1.5 transition-all cursor-pointer border-white/10 hover:border-[#e8d5b5]/40"
-              title="Open Expense & Split Calculator"
+              className="glass-pill px-2.5 py-1 text-xs text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+              title="Open expense calculator"
             >
-              <Calculator className="w-3.5 h-3.5 text-[#38bdf8]" />
-              <span className="hidden sm:inline">Split & Calc</span>
+              <Calculator className="w-3 h-3" />
+              <span>Calculator</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBudgetExpanded(!isBudgetExpanded)}
+              className="glass-pill px-2.5 py-1 text-xs text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer"
+            >
+              <PieChart className="w-3 h-3 text-[#e8d5b5]" />
+              <span>{isBudgetExpanded ? "Hide Categories" : "Categories"}</span>
+              {isBudgetExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
             </button>
           </div>
         </div>
 
-        {/* Smooth Animated Progress Bar */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[10px] text-slate-400 font-mono">
-            <span>Budget Allocation: {Math.round(budgetUtilization)}%</span>
-            <span>
-              {formatCurrency(totalPlannedCost, currency)} of{" "}
-              {formatCurrency(numericTargetBudget, currency)}
-            </span>
-          </div>
-          <div className="h-2.5 w-full bg-white/10 rounded-full overflow-hidden p-0.5">
-            <div
-              style={{ width: `${Math.min(100, Math.max(0, budgetUtilization))}%` }}
-              className={`h-full rounded-full transition-all duration-500 shadow-md ${
-                remainingBudget < 0
-                  ? "bg-gradient-to-r from-amber-400 to-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.5)]"
-                  : budgetUtilization >= 85
-                  ? "bg-gradient-to-r from-[#38bdf8] to-amber-400 shadow-[0_0_10px_rgba(251,191,36,0.5)]"
-                  : "bg-gradient-to-r from-[#38bdf8] via-[#e8d5b5] to-[#34d399] shadow-[0_0_10px_rgba(56,189,248,0.4)]"
-              }`}
-            />
-          </div>
+        {/* Clean, slim progress line */}
+        <div className="h-2 w-full bg-white/10 rounded-full overflow-hidden p-0.5">
+          <div
+            style={{ width: `${Math.min(100, Math.max(0, budgetUtilization))}%` }}
+            className={`h-full rounded-full transition-all duration-500 ${
+              remainingBudget < 0
+                ? "bg-gradient-to-r from-amber-400 to-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"
+                : budgetUtilization >= 85
+                ? "bg-gradient-to-r from-[#38bdf8] to-amber-400"
+                : "bg-gradient-to-r from-[#38bdf8] to-[#34d399]"
+            }`}
+          />
         </div>
 
-        {/* Category Breakdown Pills */}
-        <div className="pt-2 border-t border-white/5">
-          <div className="text-[9px] uppercase tracking-widest text-[#e8d5b5] font-medium mb-2">
-            Category Breakdown
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+        {/* Expandable Category Pills */}
+        {isBudgetExpanded && (
+          <div className="pt-2 border-t border-white/5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 animate-reveal">
             {[
               { cat: "Stay", label: "Stays", icon: "🏨" },
               { cat: "Dining", label: "Dining", icon: "🍷" },
@@ -1001,291 +1017,255 @@ function ManualPlannerContent() {
               )
             })}
           </div>
-        </div>
+        )}
       </div>
 
-      {/* ─── 4. MOBILE VIEWPORT STICKY 3-TAB CONTROLS (<1024px) (Requirement 10) ─── */}
-      <div className="lg:hidden sticky top-16 z-30 bg-[#050a10]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-1 shadow-2xl flex items-center gap-1">
-        <button
-          type="button"
-          onClick={() => setMobileTab("trip")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            mobileTab === "trip"
-              ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_12px_rgba(232,213,181,0.4)]"
-              : "text-slate-300 hover:text-white"
-          }`}
-        >
-          <Sliders className="w-3.5 h-3.5" />
-          <span>Days ({days.length}d)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("day")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            mobileTab === "day"
-              ? "bg-[#38bdf8] text-[#050a10] shadow-[0_0_12px_rgba(56,189,248,0.4)]"
-              : "text-slate-300 hover:text-white"
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5" />
-          <span>Day {activeDayNumber} ({activeDay.activities.length})</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("budget")}
-          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1 transition-all cursor-pointer ${
-            mobileTab === "budget"
-              ? "bg-[#34d399] text-[#050a10] shadow-[0_0_12px_rgba(52,211,153,0.4)]"
-              : "text-slate-300 hover:text-white"
-          }`}
-        >
-          <DollarSign className="w-3.5 h-3.5" />
-          <span>Notes & Stats</span>
-        </button>
-      </div>
-
-      {/* ─── 5. MAIN STUDIO VIEW: DAY NAVIGATOR + TIMELINE ─────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-        {/* Left Column: Day Manager & Quick Notes */}
-        <div
-          className={`lg:col-span-4 space-y-4 ${
-            mobileTab === "trip" ? "block" : "hidden lg:block"
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="editorial-tag text-[#38bdf8]">Days ({days.length})</span>
+      {/* ─── 4. HORIZONTAL DAY TABS BAR (Effortless 1-click day switching) ─── */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+        {days.map((day) => {
+          const isSelected = day.dayNumber === activeDayNumber
+          const dayDate = formatDisplayDate(startDate, day.dayNumber - 1)
+          return (
             <button
-              onClick={handleAddDay}
-              className="glass-pill px-3 py-1.5 rounded-full text-xs font-semibold text-white hover:text-[#e8d5b5] flex items-center gap-1.5 cursor-pointer"
+              key={day.dayNumber}
+              type="button"
+              onClick={() => setActiveDayNumber(day.dayNumber)}
+              className={`px-4 py-2.5 rounded-2xl text-xs font-semibold shrink-0 transition-all cursor-pointer flex items-center gap-2 border ${
+                isSelected
+                  ? "bg-[#e8d5b5] text-[#050a10] border-[#e8d5b5] shadow-[0_0_15px_rgba(232,213,181,0.3)]"
+                  : "glass-card text-slate-300 hover:text-white hover:border-white/20"
+              }`}
             >
-              <Plus className="w-3.5 h-3.5 text-[#38bdf8]" />
-              <span>Add Day</span>
+              <span>Day {day.dayNumber}</span>
+              {dayDate && (
+                <span className={`text-[10px] font-mono ${isSelected ? "text-[#050a10]/70" : "text-slate-400"}`}>
+                  • {dayDate}
+                </span>
+              )}
+              <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-mono ${
+                isSelected ? "bg-[#050a10]/20 text-[#050a10]" : "bg-white/10 text-slate-400"
+              }`}>
+                {day.activities.length}
+              </span>
             </button>
-          </div>
+          )
+        })}
 
-          <div className="space-y-2.5">
-            {days.map((day) => {
-              const isSelected = day.dayNumber === activeDayNumber
-              const dayDate = formatDisplayDate(startDate, day.dayNumber - 1)
-              return (
-                <div
-                  key={day.dayNumber}
-                  onClick={() => {
-                    setActiveDayNumber(day.dayNumber)
-                    setMobileTab("day")
-                  }}
-                  className={`p-4 rounded-2xl border cursor-pointer transition-all flex items-center justify-between group ${
-                    isSelected
-                      ? "glass-pill active border-[#e8d5b5] shadow-[0_0_15px_rgba(232,213,181,0.25)]"
-                      : "glass-card hover:border-white/20"
-                  }`}
+        <button
+          type="button"
+          onClick={handleAddDay}
+          className="glass-pill px-3.5 py-2.5 rounded-2xl text-xs font-semibold text-[#38bdf8] hover:text-white flex items-center gap-1.5 shrink-0 transition-all cursor-pointer border-dashed border-[#38bdf8]/40 hover:border-[#38bdf8]"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>Add Day</span>
+        </button>
+      </div>
+
+      {/* ─── 5. ACTIVE DAY WORKSPACE ───────────────────────────────────────── */}
+      <div className="glass-shell p-5 sm:p-7 rounded-3xl border border-white/15 shadow-2xl space-y-6">
+        {/* Day Header with Inline Edit and Fast Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
+          <div className="space-y-1 flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="editorial-tag text-[#38bdf8]">
+                Day {activeDay.dayNumber}
+              </span>
+              {formatDisplayDate(startDate, activeDay.dayNumber - 1) && (
+                <span className="text-[10px] font-mono text-[#e8d5b5] glass-pill px-2 py-0.5 rounded-full">
+                  {formatDisplayDate(startDate, activeDay.dayNumber - 1)}
+                </span>
+              )}
+              {days.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => handleDeleteDay(activeDay.dayNumber)}
+                  className="text-slate-500 hover:text-rose-400 text-xs flex items-center gap-1 ml-2 transition-colors cursor-pointer"
+                  title={`Delete Day ${activeDay.dayNumber}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center font-bold text-xs text-[#e8d5b5]">
-                      {day.dayNumber}
-                    </span>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="text-xs font-semibold text-white leading-tight">
-                          {day.title}
-                        </p>
-                      </div>
-                      <span className="text-[10px] text-[#94a3b8] block mt-0.5 font-mono">
-                        {dayDate ? `${dayDate} • ` : ""}
-                        {day.activities.length} experience{day.activities.length === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                  </div>
+                  <Trash2 className="w-3 h-3" />
+                  <span className="text-[10px]">Remove Day</span>
+                </button>
+              )}
+            </div>
 
-                  {/* Delete Day Button (Requirement 6) */}
-                  {days.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleDeleteDay(day.dayNumber)
-                      }}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-500/10 opacity-70 group-hover:opacity-100 transition-all cursor-pointer"
-                      title={`Delete Day ${day.dayNumber}`}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          {/* Quick Notes Card */}
-          <div className="glass-dock p-4 rounded-2xl border border-white/15 shadow-lg space-y-2 text-xs">
-            <label className="editorial-tag text-[9px] text-[#e8d5b5] flex items-center gap-1.5">
-              <FileText className="w-3.5 h-3.5 text-[#38bdf8]" />
-              Personal Notes & Reminders
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Packing reminders, tickets, reservations..."
-              rows={4}
-              className="w-full glass-input rounded-xl p-3 text-xs text-slate-200 focus:outline-none"
+            <input
+              type="text"
+              value={activeDay.title}
+              onChange={(e) => handleUpdateDayTitle(e.target.value)}
+              className="w-full bg-transparent font-editorial text-xl sm:text-2xl font-bold text-white border-b border-transparent hover:border-white/20 focus:border-[#e8d5b5] focus:outline-none transition-colors py-0.5"
+              placeholder="Name this day (e.g. Coastal Exploration)"
+              title="Click to rename day focus title"
             />
           </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* AI Suggest Experience */}
+            <button
+              type="button"
+              onClick={handleAiSuggestStop}
+              disabled={isSuggesting}
+              className="glass-pill px-3 py-2 text-xs font-semibold text-[#e8d5b5] hover:text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+              title="AI automatically suggests a contextual experience"
+            >
+              {isSuggesting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#38bdf8]" />
+                  <span>Curating...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  <span>AI Suggest</span>
+                </>
+              )}
+            </button>
+
+            {!isAddingActivity && (
+              <button
+                onClick={() => setIsAddingActivity(true)}
+                className="btn-luxe px-4 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md"
+              >
+                <Plus className="w-3.5 h-3.5 text-[#050a10]" />
+                <span>Add Activity</span>
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Right Column: Day Activities Timeline */}
-        <div
-          className={`lg:col-span-8 space-y-6 ${
-            mobileTab === "day"
-              ? "block"
-              : mobileTab === "budget"
-              ? "hidden lg:block"
-              : "hidden lg:block"
-          }`}
-        >
-          <div className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/15 shadow-2xl space-y-5">
-            {/* Header: Day Title with Inline Editing (Requirement 6) & Actions */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/[0.08]">
-              <div className="space-y-1 flex-1 max-w-xl">
-                <div className="flex items-center gap-2">
-                  <span className="editorial-tag text-[#38bdf8]">
-                    Day {activeDay.dayNumber} Focus
-                  </span>
-                  {formatDisplayDate(startDate, activeDay.dayNumber - 1) && (
-                    <span className="text-[10px] font-mono text-[#e8d5b5] glass-pill px-2 py-0.5 rounded-full">
-                      {formatDisplayDate(startDate, activeDay.dayNumber - 1)}
-                    </span>
-                  )}
-                </div>
+        {/* ─── ADD ACTIVITY FORM (Streamlined, frictionless entry) ─── */}
+        {isAddingActivity && (
+          <form
+            onSubmit={handleSaveActivity}
+            className="p-5 rounded-2xl glass-dock border border-[#38bdf8]/40 space-y-4 animate-reveal bg-[#050a10]/95"
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-[#38bdf8] animate-pulse" />
+                <span className="text-xs font-semibold text-white">Add Experience to Day {activeDay.dayNumber}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingActivity(false)
+                  setShowMoreAddFields(false)
+                }}
+                className="text-slate-400 hover:text-white cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-                {/* Inline Editable Day Title */}
+            {/* 1. Activity Title */}
+            <div className="space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                Activity Name *
+              </label>
+              <input
+                value={newActTitle}
+                onChange={(e) => setNewActTitle(e.target.value)}
+                placeholder="e.g. Visit Amalfi Cathedral, Seafood Lunch at Marina, Sunset Cruise..."
+                className="w-full glass-input rounded-xl h-10 px-3 text-xs sm:text-sm text-white focus:border-[#38bdf8]"
+                required
+                autoFocus
+              />
+            </div>
+
+            {/* 2. Timing: Start Time & End Time */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                  <Clock className="w-3 h-3 text-[#38bdf8]" />
+                  Start Time *
+                </label>
                 <input
-                  type="text"
-                  value={activeDay.title}
-                  onChange={(e) => handleUpdateDayTitle(e.target.value)}
-                  className="w-full bg-transparent font-editorial text-2xl sm:text-3xl font-bold text-white border-b border-transparent hover:border-white/20 focus:border-[#e8d5b5] focus:outline-none transition-colors py-0.5"
-                  title="Click to rename day focus title"
+                  type="time"
+                  value={newActStartTime}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setNewActStartTime(val)
+                    if (val) {
+                      setNewActEndTime(calculateEndTimeFromDuration(val, newActDuration))
+                    }
+                  }}
+                  className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                  required
                 />
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {/* AI Suggest Experience Button (Requirement 9) */}
-                <button
-                  type="button"
-                  onClick={handleAiSuggestStop}
-                  disabled={isSuggesting}
-                  className="glass-pill px-3.5 py-2 text-xs font-semibold text-[#e8d5b5] hover:text-white flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                  title="AI automatically suggests a contextual experience"
-                >
-                  {isSuggesting ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 animate-spin text-[#38bdf8]" />
-                      <span className="hidden sm:inline">Curating...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
-                      <span>✨ AI Suggest Stop</span>
-                    </>
-                  )}
-                </button>
-
-                {!isAddingActivity && (
-                  <button
-                    onClick={() => setIsAddingActivity(true)}
-                    className="btn-luxe px-4 py-2 text-xs font-semibold gap-1.5 cursor-pointer shadow-md"
-                  >
-                    <Plus className="w-3.5 h-3.5 text-[#050a10]" />
-                    <span>Add Experience</span>
-                  </button>
-                )}
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                  <Clock className="w-3 h-3 text-[#34d399]" />
+                  End Time *
+                </label>
+                <input
+                  type="time"
+                  value={newActEndTime}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setNewActEndTime(val)
+                    if (newActStartTime && val) {
+                      const derived = calculateDurationFromTimes(newActStartTime, val)
+                      if (derived) setNewActDuration(derived)
+                    }
+                  }}
+                  className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                  required
+                />
               </div>
             </div>
 
-            {/* + Add Activity Inline Form (Requirement 4) */}
-            {isAddingActivity && (
-              <form
-                onSubmit={handleSaveActivity}
-                className="p-5 rounded-2xl glass-dock border border-white/20 space-y-4 animate-reveal"
-              >
+            {/* 3. Location & Cost */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                  Location <span className="text-slate-500 font-normal">(optional)</span>
+                </label>
+                <input
+                  value={newActLoc}
+                  onChange={(e) => setNewActLoc(e.target.value)}
+                  placeholder="e.g. Positano Marina"
+                  className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
                 <div className="flex items-center justify-between">
-                  <span className="editorial-tag text-[#e8d5b5]">New Experience Entry</span>
+                  <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                    Cost ({currentCurrency.symbol}) <span className="text-slate-500 font-normal">(optional)</span>
+                  </label>
                   <button
                     type="button"
-                    onClick={() => setIsAddingActivity(false)}
-                    className="text-slate-400 hover:text-white"
+                    onClick={handleOpenCalcForNewActivity}
+                    className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
                   >
-                    <X className="w-4 h-4" />
+                    <Calculator className="w-2.5 h-2.5" />
+                    <span>Calc</span>
                   </button>
                 </div>
+                <input
+                  type="number"
+                  value={newActCost}
+                  onChange={(e) => setNewActCost(e.target.value)}
+                  placeholder="0 for Free"
+                  className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                />
+              </div>
+            </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+            {/* Optional "More options" accordion */}
+            {!showMoreAddFields ? (
+              <button
+                type="button"
+                onClick={() => setShowMoreAddFields(true)}
+                className="text-[11px] text-[#38bdf8] hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer pt-1"
+              >
+                <span>+ Add Category, Presets & Notes</span>
+              </button>
+            ) : (
+              <div className="space-y-3 pt-2 border-t border-white/10 animate-reveal">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5 text-[#38bdf8]" />
-                      Start Time *
-                    </label>
-                    <input
-                      type="time"
-                      value={newActStartTime}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setNewActStartTime(val)
-                        if (val) {
-                          setNewActEndTime(calculateEndTimeFromDuration(val, newActDuration))
-                        }
-                      }}
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
-                      <Clock className="w-2.5 h-2.5 text-[#34d399]" />
-                      End Time *
-                    </label>
-                    <input
-                      type="time"
-                      value={newActEndTime}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setNewActEndTime(val)
-                        if (newActStartTime && val) {
-                          const derived = calculateDurationFromTimes(newActStartTime, val)
-                          if (derived) setNewActDuration(derived)
-                        }
-                      }}
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-1 sm:col-span-2">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Title *</label>
-                    <input
-                      value={newActTitle}
-                      onChange={(e) => setNewActTitle(e.target.value)}
-                      placeholder="e.g. Positano Private Boat Charter"
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Location</label>
-                    <input
-                      value={newActLoc}
-                      onChange={(e) => setNewActLoc(e.target.value)}
-                      placeholder="e.g. Positano Marina"
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                    />
-                  </div>
-
-                  {/* Category Select Dropdown (Requirement 4) */}
-                  <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Category</label>
+                    <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Category</label>
                     <select
                       value={newActCat}
                       onChange={(e) => setNewActCat(e.target.value)}
@@ -1299,53 +1279,8 @@ function ManualPlannerContent() {
                     </select>
                   </div>
 
-                  {/* Duration Input & Presets (Requirement 4) */}
                   <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Duration</label>
-                    <input
-                      value={newActDuration}
-                      onChange={(e) => {
-                        const val = e.target.value
-                        setNewActDuration(val)
-                        if (newActStartTime) {
-                          const end = calculateEndTimeFromDuration(newActStartTime, val)
-                          if (end) setNewActEndTime(end)
-                        }
-                      }}
-                      placeholder="e.g. 1.5h, 2h, Half Day"
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                      <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                        Est. Cost ({currentCurrency.symbol})
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleOpenCalcForNewActivity}
-                        className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
-                        title="Calculate cost with numpad"
-                      >
-                        <Calculator className="w-2.5 h-2.5" />
-                        <span>Calc</span>
-                      </button>
-                    </div>
-                    <input
-                      type="number"
-                      value={newActCost}
-                      onChange={(e) => setNewActCost(e.target.value)}
-                      placeholder="0 for Free"
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                      Duration Quick Presets
-                    </label>
+                    <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Quick Duration Presets</label>
                     <div className="flex flex-wrap gap-1.5 pt-0.5">
                       {DURATION_PRESETS.map((preset) => (
                         <button
@@ -1372,122 +1307,167 @@ function ManualPlannerContent() {
                 </div>
 
                 <div className="space-y-1">
-                  <label className="editorial-tag text-[8px] text-[#94a3b8]">Description & Notes</label>
+                  <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Notes & Details</label>
                   <textarea
                     value={newActDesc}
                     onChange={(e) => setNewActDesc(e.target.value)}
-                    placeholder="Details, reservation confirmation codes, attire tips..."
+                    placeholder="Reservation codes, attire recommendations, tips..."
                     rows={2}
-                    className="w-full glass-input rounded-xl p-3 text-xs text-white"
+                    className="w-full glass-input rounded-xl p-2.5 text-xs text-white"
                   />
                 </div>
-
-                <div className="flex justify-end gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingActivity(false)}
-                    className="glass-pill px-4 py-1.5 text-xs text-white cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-luxe px-5 py-1.5 text-xs font-semibold cursor-pointer"
-                  >
-                    Save Activity
-                  </button>
-                </div>
-              </form>
+              </div>
             )}
 
-            {/* Activities List with Inline Edit & Reorder (Requirements 1 & 5) */}
-            <div className="space-y-3">
-              {activeDay.activities.map((act, actIdx) => {
-                if (editingActId === act.id) {
-                  return (
-                    <form
-                      key={act.id}
-                      onSubmit={handleSaveEdit}
-                      className="p-5 rounded-2xl glass-dock border border-[#38bdf8]/40 space-y-4 animate-reveal bg-[#050a10]/90"
+            <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAddingActivity(false)
+                  setShowMoreAddFields(false)
+                }}
+                className="glass-pill px-4 py-2 text-xs text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="btn-luxe px-5 py-2 text-xs font-semibold cursor-pointer shadow-lg"
+              >
+                Add Experience
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* ─── ACTIVITIES TIMELINE ─────────────────────────────────────────── */}
+        <div className="space-y-3">
+          {activeDay.activities.map((act, actIdx) => {
+            if (editingActId === act.id) {
+              return (
+                <form
+                  key={act.id}
+                  onSubmit={handleSaveEdit}
+                  className="p-5 rounded-2xl glass-dock border border-[#38bdf8]/40 space-y-4 animate-reveal bg-[#050a10]/95"
+                >
+                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                    <span className="text-xs font-semibold text-[#38bdf8] flex items-center gap-1.5">
+                      <Pencil className="w-3.5 h-3.5" />
+                      Edit Experience
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEditingActId(null)}
+                      className="text-slate-400 hover:text-white cursor-pointer"
                     >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  {/* 1. Title */}
+                  <div className="space-y-1">
+                    <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Activity Name *</label>
+                    <input
+                      value={editTitle}
+                      onChange={(e) => setEditTitle(e.target.value)}
+                      className="w-full glass-input rounded-xl h-10 px-3 text-xs sm:text-sm text-white"
+                      required
+                    />
+                  </div>
+
+                  {/* 2. Start Time & End Time */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                        <Clock className="w-3 h-3 text-[#38bdf8]" />
+                        Start Time *
+                      </label>
+                      <input
+                        type="time"
+                        value={editStartTime}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setEditStartTime(val)
+                          if (val) {
+                            setEditEndTime(calculateEndTimeFromDuration(val, editDuration))
+                          }
+                        }}
+                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                        <Clock className="w-3 h-3 text-[#34d399]" />
+                        End Time *
+                      </label>
+                      <input
+                        type="time"
+                        value={editEndTime}
+                        onChange={(e) => {
+                          const val = e.target.value
+                          setEditEndTime(val)
+                          if (editStartTime && val) {
+                            const derived = calculateDurationFromTimes(editStartTime, val)
+                            if (derived) setEditDuration(derived)
+                          }
+                        }}
+                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. Location & Cost */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="space-y-1">
+                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Location</label>
+                      <input
+                        value={editLoc}
+                        onChange={(e) => setEditLoc(e.target.value)}
+                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
                       <div className="flex items-center justify-between">
-                        <span className="editorial-tag text-[#38bdf8] flex items-center gap-1.5">
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit Experience
-                        </span>
+                        <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                          Cost ({currentCurrency.symbol})
+                        </label>
                         <button
                           type="button"
-                          onClick={() => setEditingActId(null)}
-                          className="text-slate-400 hover:text-white cursor-pointer"
+                          onClick={handleOpenCalcForEditActivity}
+                          className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
                         >
-                          <X className="w-4 h-4" />
+                          <Calculator className="w-2.5 h-2.5" />
+                          <span>Calc</span>
                         </button>
                       </div>
+                      <input
+                        type="number"
+                        value={editCost}
+                        onChange={(e) => setEditCost(e.target.value)}
+                        placeholder="0 for Free"
+                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                      />
+                    </div>
+                  </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  {/* Optional More Edit Options */}
+                  {!showMoreEditFields ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowMoreEditFields(true)}
+                      className="text-[11px] text-[#38bdf8] hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer pt-1"
+                    >
+                      <span>+ Edit Category, Presets & Notes</span>
+                    </button>
+                  ) : (
+                    <div className="space-y-3 pt-2 border-t border-white/10 animate-reveal">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5 text-[#38bdf8]" />
-                            Start Time *
-                          </label>
-                          <input
-                            type="time"
-                            value={editStartTime}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setEditStartTime(val)
-                              if (val) {
-                                setEditEndTime(calculateEndTimeFromDuration(val, editDuration))
-                              }
-                            }}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
-                            <Clock className="w-2.5 h-2.5 text-[#34d399]" />
-                            End Time *
-                          </label>
-                          <input
-                            type="time"
-                            value={editEndTime}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setEditEndTime(val)
-                              if (editStartTime && val) {
-                                const derived = calculateDurationFromTimes(editStartTime, val)
-                                if (derived) setEditDuration(derived)
-                              }
-                            }}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                            required
-                          />
-                        </div>
-
-                        <div className="space-y-1 sm:col-span-2">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">Title *</label>
-                          <input
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                        <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">Location</label>
-                          <input
-                            value={editLoc}
-                            onChange={(e) => setEditLoc(e.target.value)}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">Category</label>
+                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Category</label>
                           <select
                             value={editCat}
                             onChange={(e) => setEditCat(e.target.value)}
@@ -1500,52 +1480,9 @@ function ManualPlannerContent() {
                             ))}
                           </select>
                         </div>
-                        <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">Duration</label>
-                          <input
-                            value={editDuration}
-                            onChange={(e) => {
-                              const val = e.target.value
-                              setEditDuration(val)
-                              if (editStartTime) {
-                                const end = calculateEndTimeFromDuration(editStartTime, val)
-                                if (end) setEditEndTime(end)
-                              }
-                            }}
-                            placeholder="e.g. 1.5h, 2h, Half Day"
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                          />
-                        </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                         <div className="space-y-1">
-                          <div className="flex items-center justify-between">
-                            <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                              Est. Cost ({currentCurrency.symbol})
-                            </label>
-                            <button
-                              type="button"
-                              onClick={handleOpenCalcForEditActivity}
-                              className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
-                              title="Calculate cost with numpad"
-                            >
-                              <Calculator className="w-2.5 h-2.5" />
-                              <span>Calc</span>
-                            </button>
-                          </div>
-                          <input
-                            type="number"
-                            value={editCost}
-                            onChange={(e) => setEditCost(e.target.value)}
-                            placeholder="0 for Free"
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                          />
-                        </div>
-                        <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                            Duration Quick Presets
-                          </label>
+                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Quick Duration Presets</label>
                           <div className="flex flex-wrap gap-1.5 pt-0.5">
                             {DURATION_PRESETS.map((preset) => (
                               <button
@@ -1572,76 +1509,76 @@ function ManualPlannerContent() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="editorial-tag text-[8px] text-[#94a3b8]">Description</label>
+                        <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Description</label>
                         <textarea
                           value={editDesc}
                           onChange={(e) => setEditDesc(e.target.value)}
                           rows={2}
-                          className="w-full glass-input rounded-xl p-3 text-xs text-white"
+                          className="w-full glass-input rounded-xl p-2.5 text-xs text-white"
                         />
                       </div>
+                    </div>
+                  )}
 
-                      <div className="flex justify-end gap-2 pt-1">
-                        <button
-                          type="button"
-                          onClick={() => setEditingActId(null)}
-                          className="glass-pill px-4 py-1.5 text-xs text-white cursor-pointer"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="btn-luxe px-5 py-1.5 text-xs font-semibold cursor-pointer"
-                        >
-                          Save Changes
-                        </button>
-                      </div>
-                    </form>
-                  )
-                }
-
-                return (
-                  <ActivityCard
-                    key={act.id}
-                    activity={act}
-                    onDelete={handleDeleteActivity}
-                    onEdit={handleStartEdit}
-                    onMoveUp={() => handleMoveActivity(activeDay.dayNumber, act.id, "up")}
-                    onMoveDown={() => handleMoveActivity(activeDay.dayNumber, act.id, "down")}
-                    canMoveUp={actIdx > 0}
-                    canMoveDown={actIdx < activeDay.activities.length - 1}
-                    currencySymbol={currentCurrency.symbol}
-                    editable={true}
-                  />
-                )
-              })}
-
-              {activeDay.activities.length === 0 && !isAddingActivity && (
-                <div className="text-center py-12 glass-card rounded-2xl border border-white/10 space-y-3">
-                  <Clock className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
-                  <p className="text-xs text-[#94a3b8]">
-                    No activities planned for {activeDay.title} yet.
-                  </p>
-                  <div className="flex items-center justify-center gap-2 pt-1">
+                  <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
                     <button
-                      onClick={handleAiSuggestStop}
-                      disabled={isSuggesting}
-                      className="glass-pill px-4 py-2 text-xs text-[#e8d5b5] hover:text-white rounded-full cursor-pointer flex items-center gap-1.5"
+                      type="button"
+                      onClick={() => setEditingActId(null)}
+                      className="glass-pill px-4 py-2 text-xs text-white cursor-pointer"
                     >
-                      <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
-                      <span>AI Suggest Stop</span>
+                      Cancel
                     </button>
                     <button
-                      onClick={() => setIsAddingActivity(true)}
-                      className="btn-luxe px-4 py-2 text-xs font-semibold rounded-full cursor-pointer"
+                      type="submit"
+                      className="btn-luxe px-5 py-2 text-xs font-semibold cursor-pointer shadow-lg"
                     >
-                      + Add Experience
+                      Save Changes
                     </button>
                   </div>
-                </div>
-              )}
+                </form>
+              )
+            }
+
+            return (
+              <ActivityCard
+                key={act.id}
+                activity={act}
+                onDelete={handleDeleteActivity}
+                onEdit={handleStartEdit}
+                onMoveUp={() => handleMoveActivity(activeDay.dayNumber, act.id, "up")}
+                onMoveDown={() => handleMoveActivity(activeDay.dayNumber, act.id, "down")}
+                canMoveUp={actIdx > 0}
+                canMoveDown={actIdx < activeDay.activities.length - 1}
+                currencySymbol={currentCurrency.symbol}
+                editable={true}
+              />
+            )
+          })}
+
+          {activeDay.activities.length === 0 && !isAddingActivity && (
+            <div className="text-center py-12 glass-card rounded-2xl border border-white/10 space-y-3">
+              <Clock className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
+              <p className="text-xs text-[#94a3b8]">
+                No activities planned for {activeDay.title} yet.
+              </p>
+              <div className="flex items-center justify-center gap-2 pt-1">
+                <button
+                  onClick={handleAiSuggestStop}
+                  disabled={isSuggesting}
+                  className="glass-pill px-4 py-2 text-xs text-[#e8d5b5] hover:text-white rounded-full cursor-pointer flex items-center gap-1.5"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  <span>AI Suggest Stop</span>
+                </button>
+                <button
+                  onClick={() => setIsAddingActivity(true)}
+                  className="btn-luxe px-4 py-2 text-xs font-semibold rounded-full cursor-pointer"
+                >
+                  + Add Experience
+                </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
