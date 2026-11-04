@@ -52,12 +52,6 @@ interface LeafletInnerProps {
 
 export function LeafletInner({ points, center, zoom, routeCoordinates }: LeafletInnerProps) {
   const mapCenter = points.length > 0 ? ([points[0].lat, points[0].lng] as [number, number]) : center
-  const cartoApiKey =
-    process.env.NEXT_PUBLIC_CARTO_API_KEY || "cb1_51fd_1_16d18214c776b92dc87311e9"
-
-  const tileUrl = cartoApiKey
-    ? `https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png?key=${cartoApiKey}`
-    : "https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}{r}.png"
 
   return (
     <MapContainer
@@ -66,11 +60,12 @@ export function LeafletInner({ points, center, zoom, routeCoordinates }: Leaflet
       scrollWheelZoom={false}
       style={{ height: "100%", width: "100%", zIndex: 1, backgroundColor: "#050a10" }}
     >
+      {/* 100% Free Worldwide High-Performance OpenStreetMap (Zero API key required, zero watermarks) */}
       <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &amp; CartoDB'
-        url={tileUrl}
-        subdomains="abcd"
-        maxZoom={20}
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener noreferrer">OpenStreetMap</a> contributors'
+        url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+        className="aeris-dark-tiles"
+        maxZoom={19}
       />
       <MapAutoBounds points={points} routeCoordinates={routeCoordinates} />
 

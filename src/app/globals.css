@@ -322,6 +322,43 @@ button {
   font-family: inherit !important;
 }
 
+/* AERIS 100% Free Obsidian-Dark Map Tiles (Zero API Key, Zero Watermark, Global OpenStreetMap) */
+.aeris-dark-tiles {
+  filter: invert(100%) hue-rotate(195deg) brightness(82%) contrast(125%) saturate(30%) !important;
+}
+
+.leaflet-control-attribution {
+  background: rgba(5, 10, 16, 0.75) !important;
+  color: #94a3b8 !important;
+  font-size: 9px !important;
+  border-radius: 4px 0 0 0 !important;
+  padding: 2px 6px !important;
+}
+
+.leaflet-control-attribution a {
+  color: #38bdf8 !important;
+  text-decoration: none !important;
+}
+
+.leaflet-bar {
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6) !important;
+}
+
+.leaflet-bar a {
+  background-color: rgba(8, 15, 26, 0.88) !important;
+  color: #f8fafc !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+.leaflet-bar a:hover {
+  background-color: rgba(56, 189, 248, 0.25) !important;
+  color: #38bdf8 !important;
+}
+
 .leaflet-popup-content-wrapper {
   background: rgba(8, 15, 26, 0.96) !important;
   color: #ffffff !important;

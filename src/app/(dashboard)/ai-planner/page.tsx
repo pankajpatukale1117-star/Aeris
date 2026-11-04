@@ -1107,7 +1107,7 @@ function AIPlannerContent() {
                   />
                   <div className="flex items-center justify-between text-[10px] text-slate-400 px-1">
                     <span>OSRM Road Network Calculations</span>
-                    <span>CartoDB Dark Matter / OSM Tile Layer</span>
+                    <span>Global OpenStreetMap / Obsidian Dark Layer</span>
                   </div>
                 </div>
 

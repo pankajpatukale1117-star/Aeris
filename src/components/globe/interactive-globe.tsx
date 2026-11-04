@@ -29,3 +29,4 @@ interface InteractiveGlobeProps {
 export function InteractiveGlobe(props: InteractiveGlobeProps) {
   return <DynamicGlobe {...props} />
 }
+
