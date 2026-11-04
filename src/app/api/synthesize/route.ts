@@ -200,13 +200,27 @@ export async function POST(request: Request) {
     // Target location identification
     const resolvedDestination =
       entities.destination ||
-      (intentResult.requiresTripGeneration ? fallbackDest : null) ||
+      fallbackDest ||
       activeItinerary?.name ||
       null
 
     const resolvedDays = entities.durationDays || Number(days) || (activeItinerary?.days?.length || 3)
     const resolvedTravelers = entities.travelers || Number(travelers) || 2
     const resolvedBudgetTier = entities.budgetTier || (budget.toLowerCase() as BudgetTier) || "moderate"
+
+    const lowerMsg = userMessage.toLowerCase()
+    const isExplicitBypass =
+      lowerMsg.includes("just plan") ||
+      lowerMsg.includes("surprise me") ||
+      lowerMsg.includes("standard 3") ||
+      lowerMsg.includes("standard blueprint") ||
+      lowerMsg.includes("standard") ||
+      lowerMsg.includes("default") ||
+      lowerMsg.includes("blueprint") ||
+      lowerMsg.includes("curate a ") ||
+      lowerMsg.includes("build now") ||
+      lowerMsg.includes("generate now") ||
+      lowerMsg.includes("curate itinerary")
 
     // ──────────────────────────────────────────────────────────────────────────
     // BRANCH A: GENERAL CONVERSATION (Greetings, small talk)
@@ -243,6 +257,80 @@ export async function POST(request: Request) {
         hasItineraryUpdate: false,
         chatReply: reply.text.trim(),
         itinerary: activeItinerary,
+      })
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // BRANCH B: TRIP DISCOVERY & CONSULTATIVE QUESTIONNAIRE
+    // ──────────────────────────────────────────────────────────────────────────
+    // When the user expresses a desire to visit, go to, or plan a trip to a destination,
+    // but has not yet specified duration/days or budget (and didn't ask to bypass):
+    // The Concierge asks smart consultative questions (budget, days/nights, travelers, vibe).
+    const isDiscoveryIntent =
+      intent === "trip_discovery" ||
+      (!intentResult.requiresTripGeneration &&
+        Boolean(resolvedDestination) &&
+        !entities.durationDays &&
+        !isExplicitBypass)
+
+    if (isDiscoveryIntent && !isExplicitBypass) {
+      const targetPlace =
+        resolvedDestination ||
+        userMessage
+          .replace(/^(i want to go to|i want to visit|take me to|plan a trip to|travel to|visit|let's visit|let's go to|explore)\s+/i, "")
+          .trim()
+
+      // Lookup real coordinates & geographic hierarchy
+      const geoResults = await geoProvider.search(targetPlace, 1)
+      const primaryGeo = geoResults[0]
+
+      // Fetch live weather telemetry for destination
+      let liveWeather = null
+      if (primaryGeo) {
+        try {
+          liveWeather = await fetchLiveWeather(primaryGeo.lat, primaryGeo.lng, primaryGeo.displayName)
+        } catch (e) {
+          console.warn("Live weather retrieval notice in discovery:", e)
+        }
+      }
+
+      const discoveryPrompt = `You are the Chief International Concierge at ROVEO, an art-directed luxury travel technology house.
+You speak like a seasoned, hyper-knowledgeable human local insider—warm, decisive, cultured, and zero generic robotic filler.
+
+The traveler has expressed a desire to travel to, visit, or explore: "${targetPlace}" ${primaryGeo ? `(${primaryGeo.displayName})` : ""}.
+${liveWeather ? `Current Live Telemetry in ${targetPlace}: ${liveWeather.currentTempC}°C (${liveWeather.currentTempF}°F), ${liveWeather.conditionText}.` : ""}
+
+YOUR GOAL:
+1. Greet the traveler with refined warmth and genuine local appreciation (1 short, evocative paragraph capturing why ${targetPlace} is extraordinary—its unique atmosphere, culinary soul, terrain, or seasonal charm). Mention the live weather or current season if available.
+2. Ask 4 concise, elegantly formatted consultative questions so you can engineer their bespoke circadian journey:
+   - 🗓️ **Duration & Dates**: How many nights or days are you envisioning for this journey?
+   - 👥 **Travel Party**: Who is traveling with you (solo explorer, romantic couple, family, or group of friends)?
+   - 💎 **Style & Budget**: What travel tier feels right (5-star ultra-luxury sanctuaries, boutique & heritage, or smart refined budget)?
+   - 🌿 **Pace & Passions**: What rhythm and focus excites you most (e.g., deep culinary & wine immersion, historic architecture & culture, scenic nature & relaxation, or high-pulse exploration)?
+3. Conclude with an effortless quick-start note:
+   "*(Or if you prefer, simply reply 'Standard 3-day blueprint' and I will curate a signature master journey right away!)*"
+
+CRITICAL RULES:
+- Do NOT generate a structured daily itinerary or timetable yet.
+- Do NOT return JSON. Return refined, formatted markdown prose.
+- Keep it welcoming, engaging, and delightfully concise.`
+
+      const reply = await callGemini({
+        systemPrompt: discoveryPrompt,
+        userMessage,
+        history: history.slice(-4),
+        overrideKey: activeKey,
+      })
+
+      return NextResponse.json({
+        success: true,
+        intent: "trip_discovery",
+        hasItineraryUpdate: false,
+        chatReply: reply.text.trim(),
+        destination: targetPlace,
+        itinerary: activeItinerary,
+        weather: liveWeather,
+        geoLocation: primaryGeo || null,
       })
     }
 

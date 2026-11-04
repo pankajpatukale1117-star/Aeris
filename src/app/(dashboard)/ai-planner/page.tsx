@@ -196,6 +196,23 @@ function AIPlannerContent() {
   React.useEffect(() => {
     if (prefillDestination) {
       setDestination(prefillDestination)
+      setConversationHistory([
+        {
+          id: `welcome-${encodeURIComponent(prefillDestination)}`,
+          role: "ai",
+          text: `Greetings! I see you are interested in exploring **${prefillDestination}**. 
+
+To engineer your bespoke circadian journey, could you share a few details?
+1. 🗓️ **Duration**: How many nights or days would you like to stay?
+2. 👥 **Travelers**: Who is traveling (solo, couple, family, or group of friends)?
+3. 💎 **Style & Budget**: What travel tier feels right (5-star ultra-luxury sanctuaries, boutique & heritage, or smart refined budget)?
+4. 🌿 **Vibe & Pace**: What experiences excite you most (culinary deep-dives, art & history, scenic relaxation, or active adventures)?
+
+*(Or simply reply "Standard 3-day blueprint" or click 'Curate Itinerary' on the left to generate immediately!)*`,
+          timestamp: "Just now",
+          timestampMs: Date.now(),
+        },
+      ])
     }
   }, [prefillDestination])
 
@@ -360,9 +377,13 @@ function AIPlannerContent() {
       })
 
       // 3. Intelligent Query Routing: only mutate itinerary if updated
+      if (data.destination) {
+        setDestination(data.destination)
+      }
+
       if (data.hasItineraryUpdate !== false && data.itinerary) {
         setItinerary(data.itinerary)
-        setSourceModel(data.source || "gemini-2.5-flash")
+        setSourceModel(data.source || "gemini-3.5-flash-lite")
         setSelectedDay(1)
         if (data.itinerary.name) setDestination(data.itinerary.name)
         if (data.itinerary.days?.length) setDays(data.itinerary.days.length)
@@ -373,8 +394,8 @@ function AIPlannerContent() {
         })
       } else {
         toast({
-          title: "Concierge Consulted",
-          description: "Insider advice provided.",
+          title: data.intent === "trip_discovery" ? "Destination Discovered" : "Concierge Consulted",
+          description: data.intent === "trip_discovery" ? `Consulting on ${data.destination || "your expedition"}.` : "Insider advice provided.",
         })
       }
     } catch (err: any) {
