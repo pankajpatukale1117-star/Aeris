@@ -17,12 +17,9 @@ import {
   User,
   LogOut,
   LayoutDashboard,
-  KeyRound,
 } from "lucide-react"
 import { useTheme } from "next-themes"
 import { useTravelStore } from "@/lib/store/travel-store"
-import { useGeminiStore } from "@/lib/gemini-store"
-import { GeminiKeyModal } from "@/components/gemini/gemini-key-modal"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -41,17 +38,15 @@ export function Navbar() {
 
   const user = useTravelStore((state) => state.user)
   const logout = useTravelStore((state) => state.logout)
-  const { hasKey, openModal, initialize } = useGeminiStore()
 
   React.useEffect(() => {
     setMounted(true)
-    initialize()
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20)
     }
     window.addEventListener("scroll", handleScroll)
     return () => window.removeEventListener("scroll", handleScroll)
-  }, [initialize])
+  }, [])
 
   React.useEffect(() => {
     setMobileMenuOpen(false)
@@ -114,25 +109,6 @@ export function Navbar() {
 
         {/* Desktop Right Controls & CTAs */}
         <div className="hidden md:flex items-center gap-2.5">
-          {/* Gemini AI Status Indicator & Key Modal Trigger */}
-          <button
-            onClick={openModal}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full glass-pill text-[11px] font-medium transition-all hover:border-[#e8d5b5]/50 group cursor-pointer"
-            title="Gemini AI Concierge Key & Status"
-          >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                hasKey
-                  ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"
-                  : "bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.8)]"
-              }`}
-            />
-            <span className="hidden xl:inline text-xs text-slate-300 group-hover:text-white">
-              {hasKey ? "Gemini 2.5 Active" : "Set Gemini Key"}
-            </span>
-            <KeyRound className="w-3 h-3 text-[#e8d5b5] opacity-70 group-hover:opacity-100" />
-          </button>
-
           {mounted && user.isAuthenticated ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -228,24 +204,6 @@ export function Navbar() {
               <span>Travel Desk</span>
             </Link>
 
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false)
-                openModal()
-              }}
-              className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-medium text-slate-300 hover:bg-white/10"
-            >
-              <div className="flex items-center gap-2">
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    hasKey ? "bg-emerald-400" : "bg-amber-400"
-                  }`}
-                />
-                <span>Gemini 2.5 Settings</span>
-              </div>
-              <KeyRound className="w-4 h-4 text-[#e8d5b5]" />
-            </button>
-
             <div className="pt-3 border-t border-white/10 flex items-center justify-between gap-3">
               {mounted && user.isAuthenticated ? (
                 <button
@@ -272,9 +230,6 @@ export function Navbar() {
           </div>
         </div>
       )}
-
-      {/* In-App Gemini API Key Modal */}
-      <GeminiKeyModal />
     </header>
   )
 }

@@ -82,7 +82,7 @@ You MUST return pure JSON matching this exact structure:
 
 DO NOT include markdown code fences (\`\`\`json). Return ONLY valid raw JSON.`
 
-    const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
     let lastError: any = null
 
     for (const m of models) {

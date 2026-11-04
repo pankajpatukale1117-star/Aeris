@@ -180,18 +180,14 @@ export async function POST(request: Request) {
     const userMessage = (message || prompt || "").trim()
     const activeItinerary: SynthesizedItinerary | null = currentItinerary || context || null
 
-    // 1. Resolve API Key securely
-    const headerKey = request.headers.get("x-gemini-key")
-    const customKey =
-      (clientKey && clientKey.trim() && !clientKey.includes("placeholder") ? clientKey.trim() : null) ||
-      (headerKey && headerKey.trim() && !headerKey.includes("placeholder") ? headerKey.trim() : null)
-    const activeKey = customKey || process.env.GEMINI_API_KEY || ""
+    // 1. Resolve API Key strictly from server environment (never exposed to client or user)
+    const activeKey = process.env.GEMINI_API_KEY || ""
 
     if (!activeKey) {
       return NextResponse.json(
         {
           success: false,
-          error: "Gemini API key is not configured. Please set GEMINI_API_KEY in your server environment (.env.local).",
+          error: "Gemini AI is strictly configured at backend. Ensure GEMINI_API_KEY is defined in server environment.",
         },
         { status: 401 }
       )

@@ -11,7 +11,8 @@ export async function GET() {
 
   return NextResponse.json({
     configured: isConfigured,
-    model: "gemini-2.5-flash",
+    model: "gemini-3.5-flash-lite",
+    active: isConfigured,
   })
 }
 

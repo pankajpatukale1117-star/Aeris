@@ -39,7 +39,6 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
-import { useGeminiStore } from "@/lib/gemini-store"
 import { DESTINATIONS } from "@/lib/constants"
 import { SynthesizedItinerary } from "@/app/api/synthesize/route"
 import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
@@ -127,7 +126,6 @@ function AIPlannerContent() {
   const router = useRouter()
   const { toast } = useToast()
   const addTrip = useTravelStore((state) => state.addTrip)
-  const { apiKey, hasKey, openModal } = useGeminiStore()
 
   const prefillDestination = searchParams.get("destination") || ""
 
@@ -297,7 +295,6 @@ function AIPlannerContent() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(apiKey ? { "x-gemini-key": apiKey } : {}),
         },
         body: JSON.stringify({
           prompt: trimmed,
@@ -309,7 +306,6 @@ function AIPlannerContent() {
           pace: targetPace,
           lens: targetLens,
           currency,
-          apiKey: apiKey || undefined,
           currentItinerary: itinerary,
           history: conversationHistory.map((m) => ({
             role: m.role === "user" ? "user" : "model",
@@ -569,19 +565,6 @@ function AIPlannerContent() {
               </button>
             ))}
           </div>
-
-          {/* Gemini Key Pill */}
-          <button
-            onClick={openModal}
-            className="glass-pill px-3.5 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <span
-              className={`w-2 h-2 rounded-full ${
-                hasKey ? "bg-emerald-400 shadow-[0_0_8px_#34d399]" : "bg-amber-400"
-              }`}
-            />
-            <span>{hasKey ? "Gemini 2.5 Active" : "Settings"}</span>
-          </button>
 
           <Link
             href="/destinations"

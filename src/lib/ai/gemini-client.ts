@@ -9,7 +9,6 @@
  */
 
 const CANDIDATE_MODELS = [
-  "gemini-2.5-flash",
   "gemini-3.5-flash-lite",
   "gemini-3.1-flash-lite",
   "gemini-3.5-flash",
@@ -45,10 +44,10 @@ export async function callGemini(params: GeminiCallParams): Promise<GeminiCallRe
     overrideKey,
   } = params
 
-  const apiKey = overrideKey || process.env.GEMINI_API_KEY || ""
+  const apiKey = process.env.GEMINI_API_KEY || overrideKey || ""
 
   if (!apiKey || apiKey === "your_gemini_api_key" || apiKey.includes("placeholder")) {
-    throw new Error("Gemini API key is not configured. Set GEMINI_API_KEY in server environment.")
+    throw new Error("Gemini AI is strictly configured at backend. Ensure GEMINI_API_KEY is defined in server environment.")
   }
 
   // Format contents for Gemini REST API

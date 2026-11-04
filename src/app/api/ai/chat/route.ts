@@ -23,7 +23,7 @@ User question/modification request: "${message}"
 
 Provide a warm, expert, concise response (2-3 paragraphs max). If the user asked to modify the itinerary (e.g., make it cheaper, add adventure, change pace), explain specifically what adjustments you recommend.`
 
-    const models = ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
+    const models = ["gemini-3.5-flash-lite", "gemini-3.1-flash-lite", "gemini-3.5-flash", "gemini-3.8-flash"]
     let lastError: any = null
 
     for (const m of models) {
