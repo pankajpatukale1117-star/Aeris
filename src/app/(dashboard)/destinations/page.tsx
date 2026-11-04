@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation"
 import { Search, Compass, X, ArrowUpRight } from "lucide-react"
 import { DESTINATIONS } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
+import { InteractiveGlobe } from "@/components/globe/interactive-globe"
 
 const CATEGORIES = [
   "All",
@@ -68,6 +69,13 @@ function DestinationsContent() {
           An architectural atlas of sanctuaries, ancient capitals, and dramatic landscapes curated for thoughtful exploration.
         </p>
       </div>
+
+      {/* ─── 3D Planetary WebGL Globe ─────────────────────────────────── */}
+      <InteractiveGlobe
+        onSelectLocation={(pin) => {
+          setSearchQuery(pin.name)
+        }}
+      />
 
       {/* ─── Search & Category Pill Dock ─────────────────────────────────── */}
       <div className="glass-dock p-4 rounded-3xl border border-white/15 space-y-4">

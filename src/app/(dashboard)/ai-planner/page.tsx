@@ -135,7 +135,7 @@ function AIPlannerContent() {
 
   // Synchronous lock to eliminate double-firing & duplicate messages
   const isExecutingRef = React.useRef(false)
-  const [showGlobe, setShowGlobe] = React.useState(false)
+  const [showGlobe, setShowGlobe] = React.useState(searchParams.get("globe") === "true")
 
   // Multi-Turn Conversational Memory State
   const [conversationalInput, setConversationalInput] = React.useState("")
