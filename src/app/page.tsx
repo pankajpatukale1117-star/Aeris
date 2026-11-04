@@ -3,6 +3,7 @@
 import * as React from "react"
 import Link from "next/link"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import {
   Compass,
   Calendar,
@@ -25,8 +26,10 @@ import { Footer } from "@/components/layout/footer"
 import { MobileNav } from "@/components/layout/mobile-nav"
 import { DESTINATIONS, TRAVEL_STYLES } from "@/lib/constants"
 import { DestinationCard } from "@/components/destination/destination-card"
+import { InteractiveGlobe } from "@/components/globe/interactive-globe"
 
 export default function HomePage() {
+  const router = useRouter()
   const [destinationQuery, setDestinationQuery] = React.useState("")
   const [travelDates, setTravelDates] = React.useState("Oct 12 — Oct 20")
   const [travelers, setTravelers] = React.useState("2 Guests")
@@ -65,7 +68,7 @@ export default function HomePage() {
           {/* Micro Brand Tag */}
           <div className="inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full glass-pill text-white/90 text-[11px] uppercase tracking-[0.22em] font-semibold">
             <span className="w-1.5 h-1.5 rounded-full bg-[#e8d5b5] shadow-[0_0_8px_#e8d5b5]" />
-            <span>AERIS Travel Architecture</span>
+            <span>ROVEO Travel Architecture</span>
             <span className="text-white/40">•</span>
             <span className="text-[#e8d5b5]">Bespoke Journeys</span>
           </div>
@@ -185,6 +188,13 @@ export default function HomePage() {
           </Link>
         </div>
 
+        {/* ─── Hardware-Accelerated 3D WebGL Globe ────────────────────────── */}
+        <InteractiveGlobe
+          onSelectLocation={(pin) => {
+            router.push(`/ai-planner?destination=${encodeURIComponent(pin.name)}`)
+          }}
+        />
+
         {/* Asymmetrical Layout: 1 Hero Spotlight + 3 Portrait Cards */}
         <div className="space-y-8">
           {/* Large Spotlight Card (Rule 2: Strict Bounded Image Container) */}
@@ -287,7 +297,7 @@ export default function HomePage() {
       </section>
 
       {/* ─── C. AI TRAVEL PLANNING: SOPHISTICATED SYNTHESIS ───────────────── */}
-      <section className="py-28 sm:py-36 px-5 sm:px-8 max-w-6xl mx-auto w-full">
+      <section id="ai-studio-section" className="py-28 sm:py-36 px-5 sm:px-8 max-w-6xl mx-auto w-full">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 sm:gap-16 items-center">
           {/* Editorial Text Column */}
           <div className="lg:col-span-5 space-y-6">
@@ -296,7 +306,7 @@ export default function HomePage() {
               AI planning that values nuance over noise.
             </h2>
             <p className="text-sm sm:text-base text-[#94a3b8] leading-relaxed">
-              We reject chaotic chatbot dumps. AERIS’s AI engine was trained with the instincts of seasoned international concierges—balancing geographic proximity, natural circadian pace, and local secrets.
+              We reject chaotic chatbot dumps. ROVEO’s AI engine was trained with the instincts of seasoned international concierges—balancing geographic proximity, natural circadian pace, and local secrets.
             </p>
 
             <ul className="space-y-3.5 text-xs sm:text-sm text-[#f1f5f9]/90 pt-1">

@@ -228,14 +228,14 @@ export async function POST(request: Request) {
           success: true,
           intent,
           hasItineraryUpdate: false,
-          chatReply: "Hello! Welcome to AERIS, your worldwide luxury travel concierge. Where would you like to explore? Ask me about any destination, request weather or route telemetry, or tell me where you'd like to plan your next journey.",
+          chatReply: "Hello! Welcome to ROVEO, your art-directed luxury travel technology house. Where would you like to explore? Ask me about any destination, request weather or route telemetry, or tell me where you'd like to plan your next journey.",
           itinerary: activeItinerary,
         })
       }
 
       // Natural conversational assistant reply via Gemini
       const reply = await callGemini({
-        systemPrompt: "You are AERIS, a cultured, world-class luxury AI travel concierge. Respond warmly and concisely (1-2 short paragraphs) to the user's conversational message. Do NOT generate or suggest a structured itinerary unless requested. Ask an inviting travel question to continue the conversation.",
+        systemPrompt: "You are the Chief International Concierge at ROVEO, an art-directed luxury travel technology house. You speak like a seasoned, hyper-knowledgeable human local insider—warm, decisive, cultured, and zero generic robotic filler. Respond warmly and concisely (1-2 short paragraphs) to the user's conversational message. Do NOT generate or suggest a structured itinerary unless requested. Ask an inviting travel question to continue the conversation.",
         userMessage,
         history: history.slice(-4),
         overrideKey: activeKey,
@@ -378,7 +378,9 @@ Explain the itemized budget clearly to the user with realistic assumptions. Stat
       const targetDay = entities.targetDay || 2
       const modificationRequest = entities.modificationRequest || userMessage
 
-      const modifyPrompt = `You are the Chief International Concierge for AERIS.
+      const modifyPrompt = `You are the Chief International Concierge at ROVEO, an art-directed luxury travel technology house.
+You speak like a seasoned, hyper-knowledgeable human local insider—warm, decisive, cultured, and zero generic robotic filler.
+
 The user wants to modify their active itinerary for "${activeItinerary.name}":
 User Request: "${userMessage}"
 Target Day: Day ${targetDay}
@@ -388,9 +390,9 @@ Active Itinerary Data:
 ${JSON.stringify(activeItinerary)}
 
 CRITICAL INSTRUCTIONS:
-1. Modify ONLY the requested day(s) or stops while maintaining the rest of the itinerary intact.
-2. If modifying Day ${targetDay}, give it an updated theme and 3 distinct stops matching the user's criteria (e.g. more nature, less walking, sunset viewpoints, local cuisine).
-3. In "chatReply", warmly explain specifically what changes you made and why.
+1. Deep Regional Nuance: Name authentic local spots, trails, viewpoints, or historic dining options. If Kolhapur, mention Rankala Lake, Panhala Fort, Mahalakshmi Temple, authentic Tambda/Pandhra Rassa or Misal spots. If Kyoto, Amalfi, Zermatt, or any small village on Earth, name exact authentic spots.
+2. Conversational Memory & Mutation: Modify ONLY the requested day(s) or stops while maintaining the rest of the itinerary intact. If the user asks "make day 2 less walking", explain why in your chat reply, swap out strenuous trails for relaxed viewpoints, and keep the rest intact.
+3. In "chatReply", warmly address the user directly, explaining specifically what changes you made and why.
 
 Return ONLY pure valid JSON matching the exact SynthesizedItinerary schema. Do NOT wrap in markdown fences.`
 
@@ -450,7 +452,9 @@ Return ONLY pure valid JSON matching the exact SynthesizedItinerary schema. Do N
       currency: currency as CurrencyCode,
     })
 
-    const planningPrompt = `You are the Principal Travel Curator and Chief Itinerary Architect for AERIS, an ultra-luxury AI travel concierge.
+    const planningPrompt = `You are the Chief International Concierge at ROVEO, an art-directed luxury travel technology house.
+You speak like a seasoned, hyper-knowledgeable human local insider—warm, decisive, cultured, and zero generic robotic filler.
+
 Your task is to synthesize a genuine, deeply personalized, realistic day-by-day travel itinerary.
 
 INPUT PARAMETERS:
@@ -464,10 +468,10 @@ INPUT PARAMETERS:
 - Specific User Request: "${userMessage}"
 ${liveWeather ? `- Live Weather: ${liveWeather.currentTempC}°C, ${liveWeather.conditionText}` : ""}
 
-CRITICAL CURATION & QUALITY GUIDELINES:
-1. Deep Regional Specificity:
-   - Identify the exact geographic location (metropolis, state, town, or small village).
-   - Name authentic, real-world viewpoints, hiking trails, heritage monuments, sacred shrines, scenic valleys, and local culinary specialties.
+CRITICAL RULES & REGIONAL NUANCE:
+1. Deep Regional Specificity: NEVER speak in vague generalities.
+   - If planning Kolhapur, mention Panhala Fort's mist, New Palace's Indo-Saracenic stone architecture, Rankala Lake sunset walks, Mahalakshmi Temple early morning dawn aarti, and authentic Kolhapuri cuisine (Tambda and Pandhra Rassa, Kolhapuri Misal at historic spots like Phadtare or Bawada, and local jaggery/chappal artisans).
+   - If planning Kyoto, Amalfi, Zermatt, or any small village on Earth, name exact streets, specific viewpoints, local seasonal harvests, and authentic family-run ateliers.
    - NEVER use generic filler like "Explore local shops", "Visit a museum", or "Dine at a restaurant". Name specific places, local markets, or authentic street food corridors.
 
 2. Distinct & Circadian-Logical Daily Plans:

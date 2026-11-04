@@ -44,6 +44,8 @@ import { DESTINATIONS } from "@/lib/constants"
 import { SynthesizedItinerary } from "@/app/api/synthesize/route"
 import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
 import { TripMap, MapPoint } from "@/components/map/trip-map"
+import { InteractiveGlobe } from "@/components/globe/interactive-globe"
+import { Globe } from "lucide-react"
 
 type CurrencyCode = "USD" | "INR" | "EUR" | "JPY"
 
@@ -133,6 +135,7 @@ function AIPlannerContent() {
 
   // Synchronous lock to eliminate double-firing & duplicate messages
   const isExecutingRef = React.useRef(false)
+  const [showGlobe, setShowGlobe] = React.useState(false)
 
   // Multi-Turn Conversational Memory State
   const [conversationalInput, setConversationalInput] = React.useState("")
@@ -140,7 +143,7 @@ function AIPlannerContent() {
     {
       id: "welcome-1",
       role: "ai",
-      text: "Greetings. I am AERIS's worldwide travel intelligence assistant. Ask me about any destination on Earth, inquire about weather, routes, or budgets, or request a bespoke circadian expedition plan.",
+      text: "Greetings. I am the Chief International Concierge at ROVEO. Ask me about any destination on Earth, inquire about weather, routes, or budgets, or request a bespoke circadian expedition plan.",
       timestamp: "Just now",
       timestampMs: Date.now(),
     },
@@ -507,7 +510,7 @@ function AIPlannerContent() {
             Multi-Turn Gemini Travel Concierge
           </div>
           <h1 className="font-editorial text-3xl sm:text-5xl font-medium tracking-tight text-[#f1f5f9]">
-            AERIS <span className="italic text-[#e8d5b5]">Concierge Studio</span>
+            ROVEO <span className="italic text-[#e8d5b5]">Concierge Studio</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-300 max-w-xl font-light">
             Your journey, your way. Chat naturally to generate or adapt live itineraries for any village, town, or metropolis on Earth.
@@ -516,6 +519,19 @@ function AIPlannerContent() {
 
         {/* Currency & API Settings Controls */}
         <div className="flex flex-wrap items-center gap-2.5 relative z-10">
+          {/* 3D WebGL Globe Toggle */}
+          <button
+            onClick={() => setShowGlobe((prev) => !prev)}
+            className={`glass-pill px-3.5 py-2 text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
+              showGlobe
+                ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]"
+                : "text-slate-300 hover:text-white hover:border-[#38bdf8]/50"
+            }`}
+          >
+            <Globe className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span>{showGlobe ? "Close 3D Globe" : "3D Planetary Atlas"}</span>
+          </button>
+
           {/* Currency Switcher */}
           <div className="flex items-center glass-pill rounded-full p-1 border border-white/10">
             {CURRENCIES.map((c) => (
@@ -555,6 +571,19 @@ function AIPlannerContent() {
           </Link>
         </div>
       </div>
+
+      {/* ─── 3D WEBGL INTERACTIVE GLOBE (OPTIONAL OVERVIEW) ────────────────── */}
+      {showGlobe && (
+        <InteractiveGlobe
+          onSelectLocation={(pin) => {
+            setDestination(pin.name)
+            executeMultiTurnQuery({
+              queryText: `Curate a tailored circadian travel blueprint for ${pin.name} focusing on ${lens} at a ${pace} pace.`,
+              overrideDest: pin.name,
+            })
+          }}
+        />
+      )}
 
       {/* ─── 1. REAL MULTI-TURN CONVERSATIONAL AI CHAT STUDIO (PROMINENT HERO) ─ */}
       <div className="glass-shell rounded-3xl p-5 sm:p-7 border border-white/15 shadow-2xl relative overflow-hidden space-y-4">

@@ -4,25 +4,26 @@ import { ThemeProvider } from "@/components/providers/theme-provider"
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: "AERIS — Your Journey, Your Way | AI Travel Concierge & Interactive Atlas",
+  title: "ROVEO — Your Journey, Your Way | 3D WebGL AI Travel Concierge",
   description:
-    "Luxury AI Travel Concierge & Interactive Atlas. Discover extraordinary sanctuaries, synthesize bespoke multi-day itineraries with intelligence, or craft custom routes with total autonomy.",
+    "ROVEO is an art-directed luxury travel technology house featuring a 60fps 3D Interactive WebGL Globe, Conversational Gemini AI Studio, and bespoke circadian itinerary architecture.",
   keywords: [
-    "AERIS",
+    "ROVEO",
     "AI travel concierge",
+    "3D WebGL globe",
     "luxury travel",
     "interactive atlas",
     "trip architect",
     "bespoke itineraries",
     "liquid glassmorphism",
   ],
-  authors: [{ name: "AERIS Travel Architecture" }],
+  authors: [{ name: "ROVEO Travel Architecture" }],
   openGraph: {
-    title: "AERIS — Your Journey, Your Way",
+    title: "ROVEO — Your Journey, Your Way",
     description:
-      "Luxury AI Travel Concierge & Interactive Atlas with Liquid Glassmorphism UI.",
+      "Luxury AI Travel Concierge & 3D Interactive WebGL Atlas with Liquid Glassmorphism UI.",
     type: "website",
-    siteName: "AERIS",
+    siteName: "ROVEO",
   },
 }
 

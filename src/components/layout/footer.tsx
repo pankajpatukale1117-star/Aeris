@@ -11,17 +11,17 @@ export function Footer() {
           <div className="md:col-span-5 space-y-5">
             <Link href="/" className="flex items-center gap-2 group">
               <span className="font-editorial text-3xl font-bold tracking-tight text-[#f1f5f9] group-hover:text-[#e8d5b5] transition-colors">
-                AERIS
+                ROVEO
               </span>
               <span className="w-2 h-2 rounded-full bg-[#e8d5b5] shadow-[0_0_8px_rgba(232,213,181,0.8)]" />
             </Link>
 
             <p className="font-editorial text-xl italic text-[#e8d5b5] max-w-sm font-normal">
-              "Your journey. Your rules. Your world."
+              "Your Journey, Your Way."
             </p>
 
             <p className="text-xs text-[#94a3b8] max-w-sm leading-relaxed">
-              AERIS is an art-directed luxury travel technology house designed for discerning travelers who value intention, architectural beauty, and bespoke discovery across the globe.
+              ROVEO is an art-directed luxury travel technology house designed for discerning travelers who value intention, architectural beauty, and bespoke discovery across the globe.
             </p>
 
             <div className="pt-2 flex items-center gap-3">

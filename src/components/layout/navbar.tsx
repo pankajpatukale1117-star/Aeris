@@ -82,7 +82,7 @@ export function Navbar() {
         {/* Brand Wordmark with Liquid Champagne Accent */}
         <Link href="/" className="flex items-center gap-2 group tracking-tight">
           <span className="font-editorial text-2xl sm:text-3xl font-bold tracking-[-0.03em] text-[#f1f5f9] group-hover:text-[#e8d5b5] transition-colors">
-            AERIS
+            ROVEO
           </span>
           <span className="w-1.5 h-1.5 rounded-full bg-[#e8d5b5] transition-transform duration-300 group-hover:scale-150 shadow-[0_0_8px_rgba(232,213,181,0.8)]" />
         </Link>
