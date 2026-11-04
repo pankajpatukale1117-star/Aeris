@@ -246,11 +246,16 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
       zoom: 1.8,
       pitch: 35,
       bearing: -8,
-      maxPitch: 80
+      maxPitch: 80,
+      renderWorldCopies: false,
+      canvasContextAttributes: { antialias: true, powerPreference: 'high-performance' }
     });
 
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-left');
+    try {
+      map.addControl(new maplibregl.GlobeControl(), 'bottom-left');
+    } catch {}
 
     const enableGlobeProjection = () => {
       try {
