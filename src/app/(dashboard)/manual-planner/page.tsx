@@ -28,8 +28,10 @@ import {
   HelpCircle,
   Loader2,
   CalendarDays,
+  Calculator,
 } from "lucide-react"
 import { ActivityCard, ActivityItem } from "@/components/trip/activity-card"
+import { TripCalculator } from "@/components/trip/trip-calculator"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
 import { DESTINATIONS } from "@/lib/constants"
@@ -291,6 +293,39 @@ function ManualPlannerContent() {
 
   // AI Suggest Activity State (Requirement 9)
   const [isSuggesting, setIsSuggesting] = React.useState(false)
+
+  // Interactive Trip Financial Calculator State
+  const [isCalcOpen, setIsCalcOpen] = React.useState(false)
+  const [calcTargetMode, setCalcTargetMode] = React.useState<"activity_new" | "activity_edit" | "budget">("activity_new")
+
+  const handleOpenCalcForNewActivity = () => {
+    setCalcTargetMode("activity_new")
+    setIsCalcOpen(true)
+  }
+
+  const handleOpenCalcForEditActivity = () => {
+    setCalcTargetMode("activity_edit")
+    setIsCalcOpen(true)
+  }
+
+  const handleOpenCalcForBudget = () => {
+    setCalcTargetMode("budget")
+    setIsCalcOpen(true)
+  }
+
+  const handleApplyCostFromCalc = (amount: number) => {
+    if (calcTargetMode === "activity_new") {
+      setNewActCost(String(amount))
+    } else if (calcTargetMode === "activity_edit") {
+      setEditCost(String(amount))
+    } else {
+      setBudget(String(amount))
+    }
+  }
+
+  const handleApplyTargetBudgetFromCalc = (amount: number) => {
+    setBudget(String(amount))
+  }
 
   // Active Day Resolution
   const activeDay = days.find((d) => d.dayNumber === activeDayNumber) || days[0] || {
@@ -661,6 +696,21 @@ function ManualPlannerContent() {
             ))}
           </div>
 
+          {/* Calculator Button */}
+          <button
+            type="button"
+            onClick={handleOpenCalcForBudget}
+            className={`glass-pill px-3.5 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isCalcOpen
+                ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]"
+                : "text-slate-200 hover:text-white hover:border-[#38bdf8]/50"
+            }`}
+            title="Open Trip Expense & Split Calculator"
+          >
+            <Calculator className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span>Calculator</span>
+          </button>
+
           <button
             onClick={handleCopyItinerary}
             className="glass-pill px-3.5 py-2 text-xs font-semibold text-slate-200 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer hover:border-white/30"
@@ -732,9 +782,20 @@ function ManualPlannerContent() {
             />
           </div>
           <div className="space-y-1.5">
-            <label className="editorial-tag text-[9px] text-[#e8d5b5]">
-              Target Budget ({currentCurrency.symbol})
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="editorial-tag text-[9px] text-[#e8d5b5]">
+                Target Budget ({currentCurrency.symbol})
+              </label>
+              <button
+                type="button"
+                onClick={handleOpenCalcForBudget}
+                className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                title="Calculate target budget"
+              >
+                <Calculator className="w-2.5 h-2.5" />
+                <span>Calc</span>
+              </button>
+            </div>
             <input
               type="number"
               value={budget}
@@ -778,21 +839,21 @@ function ManualPlannerContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 text-xs font-mono">
+          <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-xs font-mono">
             <div>
               <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Planned</span>
               <span className="text-sm font-bold text-[#38bdf8]">
                 {formatCurrency(totalPlannedCost, currency)}
               </span>
             </div>
-            <div className="w-[1px] h-7 bg-white/10" />
+            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
             <div>
               <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Target</span>
               <span className="text-sm font-bold text-white">
                 {formatCurrency(numericTargetBudget, currency)}
               </span>
             </div>
-            <div className="w-[1px] h-7 bg-white/10" />
+            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
             <div>
               <span className="text-[9px] uppercase tracking-wider text-slate-400 block">Remaining</span>
               <span
@@ -808,6 +869,16 @@ function ManualPlannerContent() {
                 {formatCurrency(Math.abs(remainingBudget), currency)}
               </span>
             </div>
+            <div className="w-[1px] h-7 bg-white/10 hidden sm:block" />
+            <button
+              type="button"
+              onClick={handleOpenCalcForBudget}
+              className="glass-pill px-3 py-1.5 text-xs text-[#e8d5b5] hover:text-white flex items-center gap-1.5 transition-all cursor-pointer border-white/10 hover:border-[#e8d5b5]/40"
+              title="Open Expense & Split Calculator"
+            >
+              <Calculator className="w-3.5 h-3.5 text-[#38bdf8]" />
+              <span className="hidden sm:inline">Split & Calc</span>
+            </button>
           </div>
         </div>
 
@@ -1145,9 +1216,20 @@ function ManualPlannerContent() {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                   <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                      Est. Cost ({currentCurrency.symbol})
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="editorial-tag text-[8px] text-[#94a3b8]">
+                        Est. Cost ({currentCurrency.symbol})
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleOpenCalcForNewActivity}
+                        className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                        title="Calculate cost with numpad"
+                      >
+                        <Calculator className="w-2.5 h-2.5" />
+                        <span>Calc</span>
+                      </button>
+                    </div>
                     <input
                       type="number"
                       value={newActCost}
@@ -1287,9 +1369,20 @@ function ManualPlannerContent() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                          Est. Cost ({currentCurrency.symbol})
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="editorial-tag text-[8px] text-[#94a3b8]">
+                            Est. Cost ({currentCurrency.symbol})
+                          </label>
+                          <button
+                            type="button"
+                            onClick={handleOpenCalcForEditActivity}
+                            className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                            title="Calculate cost with numpad"
+                          >
+                            <Calculator className="w-2.5 h-2.5" />
+                            <span>Calc</span>
+                          </button>
+                        </div>
                         <input
                           type="number"
                           value={editCost}
@@ -1372,6 +1465,18 @@ function ManualPlannerContent() {
           </div>
         </div>
       </div>
+
+      {/* Interactive Trip Financial & Split Calculator Modal */}
+      <TripCalculator
+        isOpen={isCalcOpen}
+        onClose={() => setIsCalcOpen(false)}
+        currency={currency}
+        currentPlannedTotal={totalPlannedCost}
+        currentTargetBudget={numericTargetBudget}
+        daysCount={days.length}
+        onApplyCost={handleApplyCostFromCalc}
+        onApplyTargetBudget={handleApplyTargetBudgetFromCalc}
+      />
     </div>
   )
 }
