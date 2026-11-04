@@ -33,6 +33,9 @@ import {
   ChevronUp,
   Bookmark,
   Navigation,
+  SlidersHorizontal,
+  ListPlus,
+  Download,
 } from "lucide-react"
 
 // Drag and Drop (dnd-kit)
@@ -1096,140 +1099,139 @@ function ManualPlannerContent() {
     router.push(`/trips/${newTrip.id}`)
   }
 
+  // Header quick action aliases
+  const openTripDetails = () => setIsSettingsOpen((prev) => !prev)
+  const handleCopy = handleCopyItinerary
+  const handleSave = handleSaveTrip
+  const toggleBucketList = () => setIsScratchpadOpen((prev) => !prev)
+  const toggleMap = () => setIsMapOpen((prev) => !prev)
+  const showMap = isMapOpen
+  const handleExportICS = handleExportCalendar
+  const dateRangeText = `${formatDisplayDate(startDate)} — ${formatDisplayDate(computedEndDate)} (${days.length} Days)`
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24 px-3 sm:px-0">
       {/* ─── 1. TOP HEADER & STUDIO QUICK CONTROLS ───────────────────────── */}
-      <div className="glass-shell p-5 sm:p-6 rounded-3xl border border-white/15 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="space-y-1.5 flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="editorial-tag text-[#e8d5b5]">Trip Planner</span>
-            {hasAutoSaved && (
-              <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 glass-pill px-2 py-0.5 rounded-full">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Auto-saved
+      <div className="glass-shell p-5 sm:p-6 rounded-3xl border border-white/15 shadow-2xl flex flex-col gap-4">
+        {/* TOP ROW: Title, Tag, and Primary Save/Details Actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+          {/* Left: Title & Metadata */}
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="editorial-tag text-[#e8d5b5] text-xs uppercase tracking-wider font-semibold">
+                Trip Planner
               </span>
-            )}
+              {hasAutoSaved && (
+                <span className="text-[10px] text-emerald-400 font-mono flex items-center gap-1 glass-pill px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Auto-saved
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <h1 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight text-white truncate max-w-xl">
+                {tripTitle || "Custom Mediterranean Getaway"}
+              </h1>
+              <button
+                onClick={openTripDetails}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-[#38bdf8] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                title="Edit Trip Details"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex items-center gap-3 text-xs text-slate-300 flex-wrap">
+              <span className="flex items-center gap-1 text-slate-300">
+                <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                {destination || "Amalfi Coast, Italy"}
+              </span>
+              <span className="text-slate-600">•</span>
+              <span className="flex items-center gap-1 text-slate-300">
+                <Calendar className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                {dateRangeText || "Sep 10 — Sep 11 (2 Days)"}
+              </span>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <h1 className="font-editorial text-2xl sm:text-4xl font-bold tracking-tight text-white truncate">
-              {tripTitle || "Custom Itinerary"}
-            </h1>
+          {/* Top Right: Core Journey Actions */}
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
             <button
-              onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-[#38bdf8] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-              title="Edit Trip Details"
+              onClick={openTripDetails}
+              className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
             >
-              <Pencil className="w-4 h-4" />
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              Trip Details
             </button>
-          </div>
-
-          <div className="flex items-center gap-2 text-xs text-slate-300 flex-wrap">
-            <span className="flex items-center gap-1 text-[#38bdf8] font-medium">
-              <MapPin className="w-3.5 h-3.5" />
-              {destination || "Set destination"}
-            </span>
-            <span className="text-white/20">•</span>
-            <span className="flex items-center gap-1 text-slate-300">
-              <Calendar className="w-3.5 h-3.5 text-[#e8d5b5]" />
-              {formatDisplayDate(startDate)} — {formatDisplayDate(computedEndDate)} ({days.length} Days)
-            </span>
+            <button
+              onClick={handleCopy}
+              className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              Copy
+            </button>
+            <button
+              onClick={handleSave}
+              className="px-4 py-1.5 rounded-xl bg-[#e8d5b5] text-slate-900 font-medium text-xs hover:bg-[#dfcaa7] transition-colors flex items-center gap-1.5 shadow-md cursor-pointer"
+            >
+              <Bookmark className="w-3.5 h-3.5" />
+              Save Journey
+            </button>
           </div>
         </div>
 
-        {/* Action Controls */}
-        <div className="flex items-center gap-2 flex-wrap shrink-0">
-          {/* Currency Switcher */}
-          <div className="flex items-center glass-pill rounded-full p-0.5 border border-white/10">
-            {CURRENCIES.map((c) => (
+        {/* BOTTOM ROW: Currency Switcher & Utility Tools */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+          {/* Currency Toggle */}
+          <div className="flex items-center gap-1 glass-pill p-1 rounded-xl bg-white/5 border border-white/10">
+            {["USD", "INR", "EUR", "JPY"].map((curr) => (
               <button
-                key={c.code}
-                onClick={() => setCurrency(c.code)}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-semibold transition-all cursor-pointer ${
-                  currency === c.code
-                    ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_8px_rgba(232,213,181,0.4)]"
-                    : "text-slate-400 hover:text-white"
+                key={curr}
+                onClick={() => setCurrency(curr as CurrencyCode)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                  currency === curr
+                    ? "bg-white/20 text-white font-semibold shadow-sm"
+                    : "text-slate-400 hover:text-slate-200"
                 }`}
-                title={`Switch to ${c.label}`}
               >
-                {c.symbol} {c.code}
+                {curr === "INR" ? "₹ INR" : curr === "EUR" ? "€ EUR" : curr === "JPY" ? "¥ JPY" : "$ USD"}
               </button>
             ))}
           </div>
 
-          {/* Bucket List Drawer Button */}
-          <button
-            type="button"
-            onClick={() => setIsScratchpadOpen(true)}
-            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Open unassigned bucket list tray"
-          >
-            <Bookmark className="w-3.5 h-3.5 text-[#e8d5b5]" />
-            <span className="hidden sm:inline">Bucket List</span>
-            {stagedItems.length > 0 && (
-              <span className="w-4 h-4 rounded-full bg-[#e8d5b5] text-[#050a10] text-[9px] font-bold flex items-center justify-center">
-                {stagedItems.length}
-              </span>
-            )}
-          </button>
-
-          {/* Route Map Toggle Button */}
-          <button
-            type="button"
-            onClick={() => setIsMapOpen(!isMapOpen)}
-            className={`glass-pill px-3 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isMapOpen
-                ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 shadow-sm"
-                : "text-slate-300 hover:text-white"
-            }`}
-            title="Toggle interactive route map & spatial optimizer"
-          >
-            <MapPin className="w-3.5 h-3.5 text-[#38bdf8]" />
-            <span className="hidden sm:inline">{isMapOpen ? "Hide Map" : "Route Map"}</span>
-          </button>
-
-          {/* Calendar (.ics) Export Button */}
-          <button
-            type="button"
-            onClick={handleExportCalendar}
-            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Export itinerary to Google Calendar, Apple Calendar, Outlook (.ics)"
-          >
-            <CalendarDays className="w-3.5 h-3.5 text-[#34d399]" />
-            <span className="hidden sm:inline">Export .ics</span>
-          </button>
-
-          {/* Edit Trip Details Button */}
-          <button
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className={`glass-pill px-3 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              isSettingsOpen ? "bg-white/20 text-white border-white/40 shadow-sm" : "text-slate-200 hover:text-white"
-            }`}
-            title="Edit destination, dates, and target budget"
-          >
-            <Sliders className="w-3.5 h-3.5 text-[#e8d5b5]" />
-            <span>{isSettingsOpen ? "Hide Settings" : "Trip Details"}</span>
-            {isSettingsOpen ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-
-          {/* Copy Dossier */}
-          <button
-            onClick={handleCopyItinerary}
-            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
-            title="Copy Itinerary summary"
-          >
-            <Copy className="w-3.5 h-3.5 text-[#38bdf8]" />
-            <span className="hidden sm:inline">Copy</span>
-          </button>
-
-          {/* Save Journey Primary Button */}
-          <button
-            onClick={handleSaveTrip}
-            className="btn-luxe px-4 py-2 text-xs font-semibold flex items-center gap-1.5 shadow-lg cursor-pointer"
-          >
-            <Save className="w-3.5 h-3.5 text-[#050a10]" />
-            <span>Save Journey</span>
-          </button>
+          {/* Utility Action Buttons */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={toggleBucketList}
+              className="px-3 py-1.5 rounded-xl border border-white/15 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <ListPlus className="w-3.5 h-3.5 text-amber-400" />
+              <span>Bucket List</span>
+              {stagedItems.length > 0 && (
+                <span className="w-4 h-4 rounded-full bg-amber-400/20 text-amber-300 text-[9px] font-bold flex items-center justify-center">
+                  {stagedItems.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={toggleMap}
+              className={`px-3 py-1.5 rounded-xl border transition-colors flex items-center gap-1.5 text-xs cursor-pointer ${
+                showMap
+                  ? "border-[#38bdf8]/40 bg-[#38bdf8]/10 text-[#38bdf8]"
+                  : "border-white/15 text-slate-300 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {showMap ? "Hide Map" : "Show Map"}
+            </button>
+            <button
+              onClick={handleExportICS}
+              className="px-3 py-1.5 rounded-xl border border-white/15 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-emerald-400" />
+              Export .ics
+            </button>
+          </div>
         </div>
       </div>
 
