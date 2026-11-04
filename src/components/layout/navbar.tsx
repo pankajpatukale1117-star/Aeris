@@ -52,11 +52,11 @@ export function Navbar() {
     setMobileMenuOpen(false)
   }, [pathname])
 
-  const navLinks = [
+  const navLinks: Array<{ name: string; href: string; badge?: string }> = [
     { name: "Atlas", href: "/destinations" },
     { name: "Curations", href: "/destinations?category=Culture" },
     { name: "My Journeys", href: "/trips" },
-    { name: "AI Concierge", href: "/ai-planner", badge: "AI" },
+    { name: "AI Concierge", href: "/ai-planner" },
   ]
 
   return (

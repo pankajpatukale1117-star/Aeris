@@ -11,7 +11,7 @@ const DynamicGlobe = dynamic(
     loading: () => (
       <div
         className="glass-shell rounded-3xl p-6 lg:p-8 relative overflow-hidden mb-12 flex flex-col items-center justify-center text-center space-y-3"
-        style={{ height: "620px", width: "100%" }}
+        style={{ height: "600px", width: "100%" }}
       >
         <Globe className="w-8 h-8 text-[#38bdf8] animate-spin" />
         <span className="text-xs text-[#e8d5b5] font-semibold tracking-widest uppercase">

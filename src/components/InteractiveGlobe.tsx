@@ -69,43 +69,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
   // Build hybrid 3D Satellite + Street/Place Labels style or Obsidian Dark Vector style
   const getMapStyle = (mode: 'satellite' | 'dark'): any => {
     if (mode === 'dark') {
-      return {
-        version: 8,
-        projection: { type: 'globe' },
-        sources: {
-          'esri-dark-base': {
-            type: 'raster',
-            tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-            ],
-            tileSize: 256,
-            attribution: 'Esri, Garmin, &copy; OpenStreetMap contributors'
-          },
-          'esri-dark-labels': {
-            type: 'raster',
-            tiles: [
-              'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}'
-            ],
-            tileSize: 256
-          }
-        },
-        layers: [
-          {
-            id: 'dark-base',
-            type: 'raster',
-            source: 'esri-dark-base',
-            minzoom: 0,
-            maxzoom: 19
-          },
-          {
-            id: 'dark-labels',
-            type: 'raster',
-            source: 'esri-dark-labels',
-            minzoom: 0,
-            maxzoom: 19
-          }
-        ]
-      };
+      return 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
     }
     return {
       version: 8,
@@ -119,10 +83,10 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
           tileSize: 256,
           attribution: 'Esri, Maxar, Earthstar Geographics'
         },
-        'esri-labels': {
+        'carto-labels': {
           type: 'raster',
           tiles: [
-            'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+            'https://basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png'
           ],
           tileSize: 256
         }
@@ -138,7 +102,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
         {
           id: 'place-labels',
           type: 'raster',
-          source: 'esri-labels',
+          source: 'carto-labels',
           minzoom: 0,
           maxzoom: 19
         }
@@ -399,18 +363,37 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
 
         {/* Search Any Place + Style Switcher */}
         <div className="flex flex-wrap items-center gap-2">
-          <form onSubmit={handlePlaceSearch} className="flex items-center gap-1.5">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search any city, village, street..."
-              className="glass-input px-3.5 py-2 rounded-xl text-xs w-48 sm:w-64"
-            />
-            <button type="submit" className="btn-luxe px-3.5 py-2 rounded-xl text-xs font-semibold">
-              Fly To
-            </button>
-          </form>
+          <div className="relative">
+            <form onSubmit={handlePlaceSearch} className="flex items-center gap-1.5">
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search any city, village, street..."
+                className="glass-input px-3.5 py-2 rounded-xl text-xs w-48 sm:w-64"
+              />
+              <button type="submit" className="btn-luxe px-3.5 py-2 rounded-xl text-xs font-semibold">
+                Fly To
+              </button>
+            </form>
+            {searchResults.length > 0 && (
+              <div className="absolute top-full left-0 mt-1 w-64 sm:w-72 glass-shell rounded-xl p-1.5 bg-[#050a10]/95 border border-white/20 shadow-2xl z-30 space-y-1">
+                {searchResults.map((res: any, idx: number) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      inspectCoordinates(parseFloat(res.lat), parseFloat(res.lon), res.display_name.split(',')[0]);
+                      setSearchResults([]);
+                    }}
+                    className="w-full text-left px-2.5 py-1.5 rounded-lg text-[11px] text-slate-200 hover:bg-white/10 hover:text-[#e8d5b5] transition-colors truncate block"
+                  >
+                    {res.display_name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"
@@ -479,7 +462,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
       <div
         className="relative w-full overflow-hidden"
         style={{
-          height: '620px',
+          height: '600px',
           width: '100%',
           backgroundColor: '#02060d',
           backgroundImage: `

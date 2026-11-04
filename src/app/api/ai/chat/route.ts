@@ -17,7 +17,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const prompt = `You are AERIS's senior travel concierge and destination specialist.
+    const prompt = `You are ROVEO's senior travel concierge and destination specialist.
 The user is currently reviewing this trip: "${currentItinerary?.title || currentItinerary?.name || "Custom Itinerary"}" in "${currentItinerary?.destination || currentItinerary?.region || "the destination"}".
 User question/modification request: "${message}"
 

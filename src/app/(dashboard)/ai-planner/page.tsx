@@ -36,11 +36,18 @@ import {
   RotateCcw,
   CloudSun,
   Wind,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Plus,
+  Settings,
+  Users,
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
 import { DESTINATIONS } from "@/lib/constants"
-import { SynthesizedItinerary } from "@/app/api/synthesize/route"
+import { SynthesizedItinerary, Stop } from "@/app/api/synthesize/route"
+import { extractDestinationFromText } from "@/lib/ai/intent-classifier"
 import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
 import {
   DetailedTripBudget,
@@ -132,9 +139,21 @@ function AIPlannerContent() {
   // Core Expedition Form Controls (Clean, universal default)
   const [destination, setDestination] = React.useState(prefillDestination || "")
   const [days, setDays] = React.useState(3)
+  const [travelers, setTravelers] = React.useState(2)
   const [pace, setPace] = React.useState("Balanced")
   const [lens, setLens] = React.useState("Architectural & Cultural Gems")
   const [currency, setCurrency] = React.useState<CurrencyCode>("USD")
+
+  // Mobile Viewport Ergonomics State (<1024px)
+  const [mobileTab, setMobileTab] = React.useState<"chat" | "itinerary">("chat")
+  const [mobileParamsExpanded, setMobileParamsExpanded] = React.useState(false)
+
+  // Inline Add Stop Form State
+  const [isAddingStop, setIsAddingStop] = React.useState(false)
+  const [newStopSlot, setNewStopSlot] = React.useState("Morning • 10:00")
+  const [newStopTitle, setNewStopTitle] = React.useState("")
+  const [newStopNote, setNewStopNote] = React.useState("")
+  const [newStopCategory, setNewStopCategory] = React.useState("sightseeing")
 
   // Synchronous lock to eliminate double-firing & duplicate messages
   const isExecutingRef = React.useRef(false)
@@ -178,6 +197,93 @@ function AIPlannerContent() {
     return points
   }, [itinerary])
 
+  // Confirmed Stops counter ("X of Y stops confirmed")
+  const confirmedCount = React.useMemo(() => {
+    if (!itinerary) return { reserved: 0, total: 0 }
+    let reserved = 0
+    let total = 0
+    itinerary.days.forEach((d) => {
+      d.stops.forEach((s) => {
+        total++
+        if (s.reserved) reserved++
+      })
+    })
+    return { reserved, total }
+  }, [itinerary])
+
+  // Toggle Reserved Slot for a stop
+  const handleToggleReserved = (dayNum: number, stopIdx: number) => {
+    if (!itinerary) return
+    const updatedDays = itinerary.days.map((day) => {
+      if (day.day !== dayNum) return day
+      const updatedStops = day.stops.map((stop, sIdx) => {
+        if (sIdx !== stopIdx) return stop
+        return { ...stop, reserved: !stop.reserved }
+      })
+      return { ...day, stops: updatedStops }
+    })
+    setItinerary({ ...itinerary, days: updatedDays })
+  }
+
+  // Reorder stops within a day (↑ / ↓)
+  const handleMoveStop = (dayNum: number, stopIdx: number, direction: "up" | "down") => {
+    if (!itinerary) return
+    const updatedDays = itinerary.days.map((day) => {
+      if (day.day !== dayNum) return day
+      const targetIdx = direction === "up" ? stopIdx - 1 : stopIdx + 1
+      if (targetIdx < 0 || targetIdx >= day.stops.length) return day
+      const newStops = [...day.stops]
+      const temp = newStops[stopIdx]
+      newStops[stopIdx] = newStops[targetIdx]
+      newStops[targetIdx] = temp
+      return { ...day, stops: newStops }
+    })
+    setItinerary({ ...itinerary, days: updatedDays })
+  }
+
+  // Remove a stop (✕)
+  const handleRemoveStop = (dayNum: number, stopIdx: number) => {
+    if (!itinerary) return
+    const updatedDays = itinerary.days.map((day) => {
+      if (day.day !== dayNum) return day
+      const newStops = day.stops.filter((_, sIdx) => sIdx !== stopIdx)
+      return { ...day, stops: newStops }
+    })
+    setItinerary({ ...itinerary, days: updatedDays })
+    toast({
+      title: "Stop Removed",
+      description: "Circadian itinerary and map waypoints updated.",
+    })
+  }
+
+  // Add a new stop to the day (+ Add Stop to Day)
+  const handleAddStop = (dayNum: number, newStop: { slot: string; title: string; note: string; category?: string }) => {
+    if (!itinerary) return
+    const updatedDays = itinerary.days.map((day) => {
+      if (day.day !== dayNum) return day
+      const baseLat = itinerary.coordinates?.[0] || 35.0116
+      const baseLng = itinerary.coordinates?.[1] || 135.7681
+      const sIdx = day.stops.length + 1
+      const stopObj: Stop = {
+        slot: newStop.slot || "Afternoon • 14:00",
+        title: newStop.title,
+        note: newStop.note || "Curated bespoke stop.",
+        dist: "Local transit",
+        reserved: false,
+        lat: baseLat + sIdx * 0.008,
+        lng: baseLng + sIdx * 0.008,
+        category: newStop.category || "sightseeing",
+      }
+      return { ...day, stops: [...day.stops, stopObj] }
+    })
+    setItinerary({ ...itinerary, days: updatedDays })
+    setIsAddingStop(false)
+    toast({
+      title: "Stop Added",
+      description: `Added "${newStop.title}" to Day ${dayNum}.`,
+    })
+  }
+
   // Ultra-Smooth Multi-Stage Loading Transitions State
   const [loading, setLoading] = React.useState(false)
   const [loadingStage, setLoadingStage] = React.useState(1)
@@ -216,7 +322,7 @@ To engineer your bespoke circadian journey, could you share a few details?
     }
   }, [prefillDestination])
 
-  // Multi-Stage animated progress ticker
+  // True milestone progress ticker (Requirement 3)
   React.useEffect(() => {
     let t1: NodeJS.Timeout
     let t2: NodeJS.Timeout
@@ -224,21 +330,24 @@ To engineer your bespoke circadian journey, could you share a few details?
 
     if (loading) {
       setLoadingStage(1)
-      setProgressPercent(24)
+      setProgressPercent(15)
 
       t1 = setTimeout(() => {
-        setLoadingStage(2)
-        setProgressPercent(64)
-      }, 950)
+        setLoadingStage(1)
+        setProgressPercent(45) // Milestone 1: Awaiting Gemini Architecture
+      }, 900)
 
       t2 = setTimeout(() => {
-        setLoadingStage(3)
-        setProgressPercent(89)
-      }, 2100)
+        setLoadingStage(2)
+        setProgressPercent(80) // Milestone 2: Fetching Open-Meteo Ground Telemetry
+      }, 2400)
 
       t3 = setTimeout(() => {
-        setProgressPercent(97)
-      }, 3400)
+        setLoadingStage(3)
+        setProgressPercent(95) // Milestone 3: Verifying Waypoints & Map Pins
+      }, 4500)
+    } else {
+      setProgressPercent(100)
     }
 
     return () => {
@@ -266,20 +375,56 @@ To engineer your bespoke circadian journey, could you share a few details?
     queryText: string
     overrideDest?: string
     overrideDays?: number
+    overrideTravelers?: number
     overridePace?: string
     overrideLens?: string
   }) => {
-    const { queryText, overrideDest, overrideDays, overridePace, overrideLens } = params
+    const { queryText, overrideDest, overrideDays, overrideTravelers, overridePace, overrideLens } = params
     const trimmed = queryText.trim()
     if (!trimmed || isExecutingRef.current) return
     isExecutingRef.current = true
     setLoading(true)
 
+    // 1. Parse parameters from user query (Requirement 1: Sync chat prompt parameters to sliders)
+    let detectedDays: number | undefined
+    const dayMatch = trimmed.match(/\b(\d{1,2})\s*(?:-\s*\d{1,2})?\s*(?:days?|d|nights?)\b/i)
+    if (dayMatch) {
+      detectedDays = parseInt(dayMatch[1], 10)
+    } else if (/\bweekend\b/i.test(trimmed)) {
+      detectedDays = 2
+    } else if (/\bfortnight\b/i.test(trimmed)) {
+      detectedDays = 14
+    } else if (/\bweek\b/i.test(trimmed)) {
+      detectedDays = 7
+    }
+
+    let detectedTravelers: number | undefined
+    const travelerMatch = trimmed.match(/\b(?:for\s+)?(\d{1,2})\s+(?:people|travelers|guests|adults|friends)\b/i)
+    if (travelerMatch) {
+      detectedTravelers = parseInt(travelerMatch[1], 10)
+    } else if (/\bsolo\b/i.test(trimmed)) {
+      detectedTravelers = 1
+    } else if (/\b(?:couple|honeymoon|two of us)\b/i.test(trimmed)) {
+      detectedTravelers = 2
+    }
+
+    const detectedCity = extractDestinationFromText(trimmed)
+
+    if (detectedDays && detectedDays >= 1 && detectedDays <= 14) {
+      setDays(detectedDays)
+    }
+    if (detectedTravelers && detectedTravelers >= 1) {
+      setTravelers(detectedTravelers)
+    }
+    if (detectedCity) {
+      setDestination(detectedCity)
+    }
+
     const nowMs = Date.now()
     const nowTime = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
     const userMsgId = `user-${nowMs}-${Math.random().toString(36).slice(2, 7)}`
 
-    // 1. Immediately append user message with deduplication
+    // Immediately append user message with deduplication
     const userMsg: ConversationMessage = {
       id: userMsgId,
       role: "user",
@@ -302,8 +447,9 @@ To engineer your bespoke circadian journey, could you share a few details?
     })
     setConversationalInput("")
 
-    const targetDest = overrideDest || destination
-    const targetDays = overrideDays || days
+    const targetDest = overrideDest || detectedCity || destination
+    const targetDays = overrideDays || detectedDays || days
+    const targetTravelers = overrideTravelers || detectedTravelers || travelers
     const targetPace = overridePace || pace
     const targetLens = overrideLens || lens
 
@@ -318,7 +464,7 @@ To engineer your bespoke circadian journey, could you share a few details?
           message: trimmed,
           destination: targetDest,
           days: targetDays,
-          travelers: 2,
+          travelers: targetTravelers,
           budget: "Moderate",
           pace: targetPace,
           lens: targetLens,
@@ -425,9 +571,10 @@ To engineer your bespoke circadian journey, could you share a few details?
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     executeMultiTurnQuery({
-      queryText: `Curate a ${days}-day circadian travel blueprint for ${destination} focusing on ${lens} at a ${pace} pace.`,
+      queryText: `Curate a ${days}-day circadian travel blueprint for ${destination || "any global sanctuary"} for ${travelers} traveler${travelers > 1 ? "s" : ""} focusing on ${lens} at a ${pace} pace.`,
       overrideDest: destination,
       overrideDays: days,
+      overrideTravelers: travelers,
       overridePace: pace,
       overrideLens: lens,
     })
@@ -482,7 +629,7 @@ To engineer your bespoke circadian journey, could you share a few details?
       title: `${itinerary.name} — ${lens.split("&")[0].trim()} Expedition`,
       destination: itinerary.region || destination,
       dates: `${itinerary.duration} • ${itinerary.season || "Curated Season"}`,
-      travelers: 2,
+      travelers: travelers || 2,
       coverImage:
         matchedDest?.image ||
         "https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=1200&q=80",
@@ -526,9 +673,9 @@ To engineer your bespoke circadian journey, could you share a few details?
   const handleCopyItinerary = () => {
     if (!itinerary) return
     const displayDaily = activeBudget ? activeBudget.dailyAveragePerPerson : itinerary.dailyCost
-    const displayTotal = activeBudget ? activeBudget.totalGroup : displayDaily * itinerary.days.length * 2
+    const displayTotal = activeBudget ? activeBudget.totalGroup : displayDaily * itinerary.days.length * travelers
     const displaySymbol = activeBudget?.symbol || activeCurrencyConfig.symbol
-    const textSummary = `AERIS Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${displaySymbol}${displayDaily.toLocaleString()} / day per traveler\nEstimated Total Budget: ${displaySymbol}${displayTotal.toLocaleString()} (${activeBudget?.travelers || 2} travelers)\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
+    const textSummary = `ROVEO Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${displaySymbol}${displayDaily.toLocaleString()} / day per traveler\nEstimated Total Budget: ${displaySymbol}${displayTotal.toLocaleString()} (${travelers} travelers)\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
     navigator.clipboard.writeText(textSummary)
     toast({
       title: "Copied to Clipboard",
@@ -667,7 +814,7 @@ To engineer your bespoke circadian journey, could you share a few details?
                   ) : (
                     <>
                       <Bot className="w-3 h-3 text-[#e8d5b5]" />
-                      <span className="text-[#e8d5b5]">AERIS Concierge</span>
+                      <span className="text-[#e8d5b5]">ROVEO Concierge</span>
                     </>
                   )}
                 </div>
@@ -712,9 +859,17 @@ To engineer your bespoke circadian journey, could you share a few details?
 
             <input
               type="text"
-              placeholder='Chat naturally: "Adjust day 2 with less walking for parents", "Add a traditional Kolhapuri mutton thali dinner", "Make it under $100/day"...'
+              placeholder='Chat naturally: "4-day trip to Paris for couple", "Adjust day 2 with less walking", "Add dinner in Montmartre"...'
               value={conversationalInput}
               onChange={(e) => setConversationalInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault()
+                  if (!loading && !isExecutingRef.current && conversationalInput.trim()) {
+                    handleChatSubmit(e)
+                  }
+                }
+              }}
               disabled={loading}
               className="glass-input w-full pl-12 sm:pl-14 pr-28 sm:pr-36 py-3.5 sm:py-4 rounded-2xl text-xs sm:text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
             />
@@ -761,10 +916,58 @@ To engineer your bespoke circadian journey, could you share a few details?
         </div>
       </div>
 
+      {/* ─── Mobile Viewport Top Sticky Segmented Tab Bar (<1024px) ─────────── */}
+      <div className="lg:hidden sticky top-16 z-30 bg-[#050a10]/95 backdrop-blur-xl border border-white/10 rounded-2xl p-1 shadow-2xl flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => setMobileTab("chat")}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mobileTab === "chat"
+              ? "bg-[#e8d5b5] text-[#050a10] shadow-[0_0_12px_rgba(232,213,181,0.4)]"
+              : "text-slate-300 hover:text-white"
+          }`}
+        >
+          <MessageSquare className="w-3.5 h-3.5" />
+          <span>Chat & Controls</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setMobileTab("itinerary")}
+          className={`flex-1 py-2.5 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+            mobileTab === "itinerary"
+              ? "bg-[#38bdf8] text-[#050a10] shadow-[0_0_12px_rgba(56,189,248,0.4)]"
+              : "text-slate-300 hover:text-white"
+          }`}
+        >
+          <Compass className="w-3.5 h-3.5" />
+          <span>Live Itinerary & Map ({days}d)</span>
+        </button>
+      </div>
+
+      {/* ─── Mobile Parameters Summary Bar ─────────────────────────────────── */}
+      <div className="lg:hidden glass-pill px-4 py-2.5 rounded-2xl border border-white/10 flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2 text-slate-200 truncate">
+          <MapPin className="w-3.5 h-3.5 text-[#38bdf8] shrink-0" />
+          <span className="font-medium truncate">{destination || "Any Global Sanctuary"}</span>
+          <span className="text-slate-500">•</span>
+          <span className="text-[#e8d5b5] font-mono">{days}d</span>
+          <span className="text-slate-500">•</span>
+          <span className="text-slate-400 font-mono">{travelers} {travelers === 1 ? "Traveler" : "Travelers"}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMobileParamsExpanded((prev) => !prev)}
+          className="glass-pill px-2.5 py-1 text-[11px] font-medium text-[#38bdf8] hover:text-white flex items-center gap-1 shrink-0 ml-2 cursor-pointer"
+        >
+          <Settings className="w-3 h-3" />
+          <span>{mobileParamsExpanded ? "Hide" : "Edit ⚙️"}</span>
+        </button>
+      </div>
+
       {/* ─── 2. MAIN TWO-COLUMN STUDIO LAYOUT ──────────────────────────────── */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Fine-Tuning Controls (5 Cols) */}
-        <div className="lg:col-span-5 space-y-6">
+        <div className={`lg:col-span-5 space-y-6 ${mobileTab === "chat" ? (mobileParamsExpanded ? "block" : "hidden lg:block") : "hidden lg:block"}`}>
           <form onSubmit={handleFormSubmit} className="glass-shell p-6 sm:p-8 rounded-3xl border border-white/10 space-y-6 shadow-2xl">
             <div className="flex items-center justify-between border-b border-white/10 pb-4">
               <div className="flex items-center gap-2 text-xs font-semibold text-white uppercase tracking-wider">
@@ -831,6 +1034,40 @@ To engineer your bespoke circadian journey, could you share a few details?
                 <span>Weekend (2d)</span>
                 <span>Week (7d)</span>
                 <span>Fortnight (14d)</span>
+              </div>
+            </div>
+
+            {/* Traveler Count Selector (Requirement 5) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between pl-1">
+                <label className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-medium flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-[#38bdf8]" />
+                  <span>Traveler Count</span>
+                </label>
+                <span className="text-xs font-semibold text-[#38bdf8] font-mono">
+                  {travelers} {travelers === 1 ? "Traveler" : "Travelers"}
+                </span>
+              </div>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { label: "1 Solo", value: 1 },
+                  { label: "2 Couple", value: 2 },
+                  { label: "4 Family", value: 4 },
+                  { label: "6 Group", value: 6 },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setTravelers(opt.value)}
+                    className={`py-2 px-1 text-center rounded-2xl text-xs font-medium border transition-all cursor-pointer ${
+                      travelers === opt.value
+                        ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white shadow-[0_0_12px_rgba(56,189,248,0.3)]"
+                        : "glass-pill text-slate-300 hover:text-white border-white/10"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
               </div>
             </div>
 
@@ -914,12 +1151,14 @@ To engineer your bespoke circadian journey, could you share a few details?
               budgetMax={activeBudget ? activeBudget.rangeMaxDailyPerPerson : itinerary.budgetMax}
               currency={currency}
               currencySymbol={activeCurrencyConfig.symbol}
+              days={days}
+              travelers={travelers}
             />
           )}
         </div>
 
         {/* Right Column: Synthesized Editorial Itinerary or Multi-Stage Skeleton (7 Cols) */}
-        <div className="lg:col-span-7 space-y-6">
+        <div className={`lg:col-span-7 space-y-6 ${mobileTab === "itinerary" ? "block" : "hidden lg:block"}`}>
           {/* ─── 3. MULTI-STAGE LOADING TRANSITIONS (3-STAGE ANIMATED TICKER) ── */}
           {loading ? (
             <div className="space-y-6 animate-reveal">
@@ -1194,7 +1433,7 @@ To engineer your bespoke circadian journey, could you share a few details?
                 .filter((d) => d.day === selectedDay)
                 .map((dayPlan) => (
                   <div key={dayPlan.day} className="space-y-4">
-                    <div className="glass-card p-4 rounded-2xl flex items-center justify-between border-l-4 border-l-[#e8d5b5]">
+                    <div className="glass-card p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-l-4 border-l-[#e8d5b5]">
                       <div>
                         <span className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-semibold">
                           Day {dayPlan.day} Circadian Focus
@@ -1203,33 +1442,73 @@ To engineer your bespoke circadian journey, could you share a few details?
                           {dayPlan.theme}
                         </h4>
                       </div>
-                      <span className="text-xs text-slate-400 font-mono">
-                        {dayPlan.stops.length} Circadian Stops
-                      </span>
+                      <div className="flex items-center gap-2.5">
+                        <span className="glass-pill px-2.5 py-1 text-[10px] font-semibold text-emerald-400 border-emerald-500/30">
+                          {confirmedCount.reserved} of {confirmedCount.total} Confirmed
+                        </span>
+                        <span className="text-xs text-slate-400 font-mono">
+                          {dayPlan.stops.length} Stops
+                        </span>
+                      </div>
                     </div>
 
                     <div className="space-y-3">
                       {dayPlan.stops.map((stop, sIdx) => (
                         <div
                           key={sIdx}
-                          className="glass-card p-5 rounded-2xl border border-white/10 space-y-2 hover:border-[#38bdf8]/30 transition-all"
+                          className="glass-card p-5 rounded-2xl border border-white/10 space-y-2 hover:border-[#38bdf8]/30 transition-all group"
                         >
-                          <div className="flex items-center justify-between text-xs">
-                            <span className="text-[#38bdf8] font-mono font-medium flex items-center gap-1.5">
+                          <div className="flex items-center justify-between text-xs gap-2">
+                            <span className="text-[#38bdf8] font-mono font-medium flex items-center gap-1.5 shrink-0">
                               <Clock className="w-3.5 h-3.5" />
                               {stop.slot}
                             </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-slate-400">{stop.dist}</span>
-                              {stop.reserved ? (
-                                <span className="glass-pill px-2 py-0.5 rounded-full text-[9px] font-semibold text-emerald-400 border-emerald-500/30">
-                                  Reserved Access
-                                </span>
-                              ) : (
-                                <span className="glass-pill px-2 py-0.5 rounded-full text-[9px] text-slate-400">
-                                  Walk-in Flow
-                                </span>
-                              )}
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                              <span className="text-[10px] text-slate-400 hidden sm:inline">{stop.dist}</span>
+                              
+                              {/* Direct Inline Stop Editing: Reserved Toggle */}
+                              <button
+                                type="button"
+                                onClick={() => handleToggleReserved(dayPlan.day, sIdx)}
+                                className={`glass-pill px-2.5 py-1 rounded-full text-[9px] font-semibold transition-all cursor-pointer ${
+                                  stop.reserved
+                                    ? "text-emerald-400 border-emerald-500/40 bg-emerald-500/10 shadow-[0_0_8px_rgba(52,211,153,0.3)]"
+                                    : "text-slate-400 hover:text-white border-white/10"
+                                }`}
+                                title="Toggle slot reservation status"
+                              >
+                                {stop.reserved ? "✓ Reserved" : "Reserve Slot"}
+                              </button>
+
+                              {/* Direct Inline Stop Editing: Reorder & Remove Buttons */}
+                              <div className="flex items-center gap-1 border-l border-white/10 pl-1.5 ml-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveStop(dayPlan.day, sIdx, "up")}
+                                  disabled={sIdx === 0}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer"
+                                  title="Move stop earlier"
+                                >
+                                  <ArrowUp className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveStop(dayPlan.day, sIdx, "down")}
+                                  disabled={sIdx === dayPlan.stops.length - 1}
+                                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 disabled:opacity-20 disabled:hover:bg-transparent transition-all cursor-pointer"
+                                  title="Move stop later"
+                                >
+                                  <ArrowDown className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveStop(dayPlan.day, sIdx)}
+                                  className="p-1 rounded-lg text-rose-400 hover:text-rose-200 hover:bg-rose-500/10 transition-all cursor-pointer"
+                                  title="Remove stop"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1242,6 +1521,106 @@ To engineer your bespoke circadian journey, could you share a few details?
                           </p>
                         </div>
                       ))}
+
+                      {/* Direct Inline Stop Editing: + Add Stop to Day Form */}
+                      {isAddingStop ? (
+                        <div className="glass-shell p-4 rounded-2xl border border-[#38bdf8]/40 space-y-3 bg-[#050a10]/80 animate-reveal">
+                          <div className="flex items-center justify-between text-xs font-semibold text-white">
+                            <span className="text-[#38bdf8] flex items-center gap-1.5">
+                              <Plus className="w-3.5 h-3.5" />
+                              Add Bespoke Stop to Day {dayPlan.day}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIsAddingStop(false)}
+                              className="text-slate-400 hover:text-white cursor-pointer"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-[10px] uppercase text-slate-400 tracking-wider">Slot / Time</label>
+                              <input
+                                type="text"
+                                value={newStopSlot}
+                                onChange={(e) => setNewStopSlot(e.target.value)}
+                                placeholder="e.g. Afternoon • 14:00"
+                                className="glass-input w-full p-2.5 rounded-xl text-xs text-white"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-[10px] uppercase text-slate-400 tracking-wider">Category</label>
+                              <select
+                                value={newStopCategory}
+                                onChange={(e) => setNewStopCategory(e.target.value)}
+                                className="glass-input w-full p-2.5 rounded-xl text-xs text-white bg-[#050a10]"
+                              >
+                                <option value="sightseeing">Sightseeing</option>
+                                <option value="dining">Dining & Culinary</option>
+                                <option value="cultural">Culture & Heritage</option>
+                                <option value="relaxation">Relaxation & Wellness</option>
+                                <option value="adventure">Active Adventure</option>
+                              </select>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase text-slate-400 tracking-wider">Stop Title</label>
+                            <input
+                              type="text"
+                              value={newStopTitle}
+                              onChange={(e) => setNewStopTitle(e.target.value)}
+                              placeholder="e.g. Sunset Aperitivo at Cliffside Terrace"
+                              className="glass-input w-full p-2.5 rounded-xl text-xs text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase text-slate-400 tracking-wider">Note / Description</label>
+                            <input
+                              type="text"
+                              value={newStopNote}
+                              onChange={(e) => setNewStopNote(e.target.value)}
+                              placeholder="e.g. Scenic panoramic view with local wine tasting."
+                              className="glass-input w-full p-2.5 rounded-xl text-xs text-white"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setIsAddingStop(false)}
+                              className="glass-pill px-3 py-1.5 text-xs text-slate-300 hover:text-white cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!newStopTitle.trim()}
+                              onClick={() => {
+                                handleAddStop(dayPlan.day, {
+                                  slot: newStopSlot,
+                                  title: newStopTitle.trim(),
+                                  note: newStopNote.trim(),
+                                  category: newStopCategory,
+                                })
+                                setNewStopTitle("")
+                                setNewStopNote("")
+                              }}
+                              className="btn-luxe px-4 py-1.5 text-xs font-semibold cursor-pointer disabled:opacity-50"
+                            >
+                              Add Stop
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsAddingStop(true)}
+                          className="w-full py-3.5 rounded-2xl border border-dashed border-white/20 hover:border-[#38bdf8]/50 text-slate-300 hover:text-white text-xs font-medium flex items-center justify-center gap-2 transition-all cursor-pointer bg-white/[0.02] hover:bg-white/[0.05]"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#38bdf8]" />
+                          <span>+ Add Stop to Day {dayPlan.day}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}

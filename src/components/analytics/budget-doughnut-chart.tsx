@@ -26,6 +26,8 @@ interface BudgetDoughnutProps {
   budgetMax?: number
   currency?: string
   currencySymbol?: string
+  days?: number
+  travelers?: number
 }
 
 export function BudgetDoughnutChart({
@@ -36,6 +38,8 @@ export function BudgetDoughnutChart({
   budgetMax: propMax = 200,
   currency: propCurrency = "USD",
   currencySymbol: propSymbol = "$",
+  days: propDays = 3,
+  travelers: propTravelers = 2,
 }: BudgetDoughnutProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
   const chartInstanceRef = React.useRef<ChartJS<"doughnut"> | null>(null)
@@ -46,6 +50,9 @@ export function BudgetDoughnutChart({
   const budgetMax = budgetTelemetry?.rangeMaxDailyPerPerson ?? propMax
   const costBreakdown = budgetTelemetry?.costBreakdownPercentages ?? propBreakdown
   const currencySymbol = budgetTelemetry?.symbol ?? propSymbol
+  const tripDays = (budgetTelemetry as any)?.durationDays ?? (budgetTelemetry as any)?.days ?? propDays
+  const tripTravelers = budgetTelemetry?.travelers ?? propTravelers
+  const totalCost = budgetTelemetry?.totalGroup ?? (dailyCost * tripDays * tripTravelers)
 
   const labels = ["Boutique Stays", "Gastronomy & Dining", "Admissions & Entry", "Transit & Rail"]
   const colors = [
@@ -196,6 +203,19 @@ export function BudgetDoughnutChart({
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Explicit Transparent Math Formula */}
+      <div className="pt-3 border-t border-white/10 text-center space-y-1">
+        <div className="text-[10px] uppercase tracking-wider text-slate-400 font-medium">
+          Transparent Expedition Calculation
+        </div>
+        <div className="font-mono text-xs text-[#e8d5b5] font-semibold">
+          {currencySymbol}{dailyCost.toLocaleString()}/person/day × {tripDays} days × {tripTravelers} travelers = {currencySymbol}{totalCost.toLocaleString()} Total
+        </div>
+        <div className="text-[9px] text-slate-400">
+          Stays + Gastronomy + Experiences + Transit = 100% Total Cost
+        </div>
       </div>
     </div>
   )

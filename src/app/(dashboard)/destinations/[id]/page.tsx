@@ -83,7 +83,7 @@ export default function DestinationDetailPage() {
   const handleShare = () => {
     if (typeof window !== "undefined" && navigator.share) {
       navigator.share({
-        title: `${destination.name} — AERIS`,
+        title: `${destination.name} — ROVEO`,
         text: destination.description,
         url: window.location.href,
       }).catch(() => {})

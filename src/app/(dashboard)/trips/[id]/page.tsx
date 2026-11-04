@@ -137,7 +137,7 @@ export default function TripDetailPage() {
   const handleShare = () => {
     if (typeof window !== "undefined" && navigator.share) {
       navigator.share({
-        title: `${trip.title} — AERIS Itinerary`,
+        title: `${trip.title} — ROVEO Itinerary`,
         text: `Check out my curated travel itinerary for ${trip.destination}`,
         url: window.location.href,
       }).catch(() => {})

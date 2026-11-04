@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       )
     }
 
-    const prompt = `You are the lead travel architect for AERIS, a luxury travel-tech product.
+    const prompt = `You are the lead travel architect for ROVEO, a luxury travel-tech product.
 Generate a structured, highly realistic, non-generic travel itinerary based on:
 - Origin: ${origin}
 - Destination: ${destination}

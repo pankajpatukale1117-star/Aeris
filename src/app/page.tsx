@@ -347,7 +347,7 @@ export default function HomePage() {
                 <div className="flex items-center gap-2">
                   <div className="w-2.5 h-2.5 rounded-full bg-[#38bdf8] shadow-[0_0_6px_#38bdf8]" />
                   <span className="text-[11px] uppercase font-bold tracking-widest text-[#e8d5b5]">
-                    AERIS AI Concierge Desk
+                    ROVEO AI Concierge Desk
                   </span>
                 </div>
                 <span className="text-[10px] text-white/50 font-mono">v2.5 Synced</span>
@@ -473,7 +473,7 @@ export default function HomePage() {
             Featured Journeys
           </h2>
           <p className="text-sm text-[#94a3b8]">
-            Explore complete blueprints planned by AERIS architects. Use as inspiration or customize for your dates.
+            Explore complete blueprints planned by ROVEO architects. Use as inspiration or customize for your dates.
           </p>
         </div>
 

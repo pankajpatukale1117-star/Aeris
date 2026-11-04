@@ -125,7 +125,7 @@ export function Footer() {
 
         {/* Bottom Colophon Row */}
         <div className="pt-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[#94a3b8]/70">
-          <p>© {new Date().getFullYear()} AERIS Travel Architecture Ltd. All rights reserved.</p>
+          <p>© {new Date().getFullYear()} ROVEO Travel Architecture Ltd. All rights reserved.</p>
           <div className="flex items-center gap-6">
             <span className="hover:text-[#f1f5f9] cursor-pointer">Privacy Charter</span>
             <span className="hover:text-[#f1f5f9] cursor-pointer">Terms of Service</span>

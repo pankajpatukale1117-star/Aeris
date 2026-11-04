@@ -344,7 +344,7 @@ CRITICAL RULES:
       const geoResults = await geoProvider.search(targetPlace, 3)
       const primaryGeo = geoResults[0]
 
-      const prompt = `You are AERIS's senior international destination specialist.
+      const prompt = `You are ROVEO's senior international destination specialist.
 Provide an engaging, culturally rich, and factual overview of: "${targetPlace}".
 ${primaryGeo ? `Verified Location Data: ${primaryGeo.displayName} (${primaryGeo.lat}, ${primaryGeo.lng})` : ""}
 
@@ -388,7 +388,7 @@ Format with graceful concierge prose (2-3 paragraphs max). Do NOT generate a str
         console.warn("Live weather retrieval notice:", e)
       }
 
-      const prompt = `You are AERIS's meteorological concierge.
+      const prompt = `You are ROVEO's meteorological concierge.
 The user is asking about the weather in "${targetPlace}".
 ${weatherData ? `LIVE OPEN-METEO TELEMETRY:
 - Current Temp: ${weatherData.currentTempC}°C (${weatherData.currentTempF}°F)
@@ -428,7 +428,7 @@ Provide a concise, practical weather briefing for travelers (including what clot
         currency: currency as CurrencyCode,
       })
 
-      const prompt = `You are AERIS's financial curator and luxury travel economist.
+      const prompt = `You are ROVEO's financial curator and luxury travel economist.
 The user is asking about the cost or budget for a trip to "${targetPlace}".
 Calculated Itemized Projections:
 - Currency: ${budgetData.currency} (${budgetData.symbol})
@@ -573,9 +573,11 @@ CRITICAL RULES & REGIONAL NUANCE:
    - NEVER use generic filler like "Explore local shops", "Visit a museum", or "Dine at a restaurant". Name specific places, local markets, or authentic street food corridors.
 
 2. Distinct & Circadian-Logical Daily Plans:
+   - CRITICAL DURATION RULE: The "days" array MUST contain EXACTLY ${resolvedDays} distinct day items, numbered Day 1 through Day ${resolvedDays}. Do not stop early or generate fewer days than requested.
    - Each day must have a unique editorial theme and completely distinct activities from the other days.
    - Organize activities chronologically: Morning (08:30–09:00), Afternoon (13:00–13:30), Twilight/Evening (17:30–19:00).
    - Ensure realistic geographic sequencing to avoid impossible backtracking along mountain roads or busy city corridors.
+   - Every single stop MUST include estimated numeric "lat" and "lng" coordinates close to ${targetDestination}.
 
 3. Truthful & Practical Grounding:
    - Provide practical navigation advice (e.g. ghat road transit, walking footwear, seasonal weather).
@@ -609,21 +611,30 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
           "title": "Exact Landmark or Trail Name",
           "note": "Insider context, sunrise light tip, or cultural note",
           "dist": "Transit / walk indicator",
-          "reserved": false
+          "reserved": false,
+          "lat": ${primaryGeo ? primaryGeo.lat : 35.0116},
+          "lng": ${primaryGeo ? primaryGeo.lng : 135.7681},
+          "category": "sightseeing"
         },
         {
           "slot": "Afternoon • 13:00",
           "title": "Exact Dining or Heritage Stop",
           "note": "Specific local culinary dish or architectural highlight",
           "dist": "Transit / walk indicator",
-          "reserved": false
+          "reserved": false,
+          "lat": ${primaryGeo ? (primaryGeo.lat + 0.01).toFixed(4) : 35.0216},
+          "lng": ${primaryGeo ? (primaryGeo.lng + 0.01).toFixed(4) : 135.7781},
+          "category": "dining"
         },
         {
           "slot": "Twilight • 17:30",
           "title": "Sunset Viewpoint or Evening Stroll",
           "note": "Golden hour perspective and dusk ambiance",
           "dist": "Transit / walk indicator",
-          "reserved": false
+          "reserved": false,
+          "lat": ${primaryGeo ? (primaryGeo.lat - 0.01).toFixed(4) : 35.0016},
+          "lng": ${primaryGeo ? (primaryGeo.lng - 0.01).toFixed(4) : 135.7581},
+          "category": "relaxation"
         }
       ]
     }
@@ -648,6 +659,34 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
         },
         { status: 502 }
       )
+    }
+
+    // Parallel geocode fallback for any stops missing coordinates (never sequential loops)
+    const missingCoordStops: Array<{ stop: Stop; query: string }> = []
+    for (const d of validated.days) {
+      for (const s of d.stops) {
+        if (typeof s.lat !== "number" || typeof s.lng !== "number") {
+          missingCoordStops.push({
+            stop: s,
+            query: `${s.title}, ${targetDestination}`,
+          })
+        }
+      }
+    }
+
+    if (missingCoordStops.length > 0) {
+      const geoLookups = await Promise.allSettled(
+        missingCoordStops.map((item) => geoProvider.search(item.query, 1))
+      )
+      geoLookups.forEach((res, idx) => {
+        if (res.status === "fulfilled" && res.value && res.value.length > 0) {
+          missingCoordStops[idx].stop.lat = res.value[0].lat
+          missingCoordStops[idx].stop.lng = res.value[0].lng
+        } else if (primaryGeo) {
+          missingCoordStops[idx].stop.lat = primaryGeo.lat + ((idx + 1) * 0.008 * (idx % 2 === 0 ? 1 : -1))
+          missingCoordStops[idx].stop.lng = primaryGeo.lng + ((idx + 1) * 0.008 * (idx % 3 === 0 ? 1 : -1))
+        }
+      })
     }
 
     // Attach deterministic telemetry - SINGLE SOURCE OF TRUTH
