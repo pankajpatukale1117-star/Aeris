@@ -1,18 +1,14 @@
 /**
  * AERIS Deterministic Travel Budget Engine
- * Single Source of Truth for Travel Budget Calculations.
+ * Single Source of Truth for all budget telemetry, daily cadences,
+ * itemized category breakdowns, and currency conversions.
  *
- * Guarantees Mathematical Invariants:
- * 1. dailyCostPerPerson = Math.round(baseDailyUsd * regionalMultiplier * fxRate)
- * 2. totalPerPerson = dailyCostPerPerson * durationDays
- * 3. totalTripCost = totalPerPerson * travelers
- * 4. dailyCostGroup = dailyCostPerPerson * travelers
- * 5. totalTripCost / travelers === totalPerPerson
- * 6. totalPerPerson / durationDays === dailyCostPerPerson
- * 7. Sum of category amounts === totalTripCost (exact to the last cent/rupee)
- * 8. Category percentages sum to 100% exactly ([42, 28, 18, 12])
- * 9. Daily range: dailyMinPerPerson and dailyMaxPerPerson for daily cadence
- * 10. Total range: totalMinGroup and totalMaxGroup for overall trip
+ * Guarantees 100% mathematical consistency:
+ * 1. Sum of category amounts === Total trip cost
+ * 2. Total trip cost / travelers === Per-person trip cost
+ * 3. Per-person trip cost / durationDays === Daily cost per person
+ * 4. Sum of category percentages === 100%
+ * 5. Deterministic currency conversion without compounding drift
  */
 
 export type BudgetTier = "budget" | "moderate" | "luxury" | "ultra-luxury"
@@ -30,7 +26,7 @@ export const CURRENCY_SYMBOLS: Record<CurrencyCode, string> = {
   CHF: "CHF ",
 }
 
-// Exchange rates relative to 1 USD (Updated Q1 2026 baseline)
+// Canonical exchange rates relative to 1 USD (Baseline)
 export const FX_RATES_FROM_USD: Record<CurrencyCode, number> = {
   USD: 1.0,
   EUR: 0.92,
@@ -42,69 +38,7 @@ export const FX_RATES_FROM_USD: Record<CurrencyCode, number> = {
   CHF: 0.90,
 }
 
-// Regional Purchasing Power Parity (PPP) & Cost of Living Index relative to US baseline (1.0)
-export function getRegionalCostFactor(destination?: string): number {
-  if (!destination) return 1.0
-  const d = destination.toLowerCase()
-
-  // South Asia & Indian Subcontinent
-  if (
-    d.includes("india") || d.includes("pune") || d.includes("mumbai") ||
-    d.includes("delhi") || d.includes("kolhapur") || d.includes("goa") ||
-    d.includes("mahabaleshwar") || d.includes("rajasthan") || d.includes("kerala") ||
-    d.includes("jaipur") || d.includes("bengaluru") || d.includes("bangalore") ||
-    d.includes("chennai") || d.includes("hyderabad") || d.includes("kolkata") ||
-    d.includes("nepal") || d.includes("sri lanka") || d.includes("bangladesh")
-  ) {
-    if (d.includes("mumbai") || d.includes("delhi") || d.includes("bengaluru") || d.includes("bangalore")) {
-      return 0.48 // Tier-1 Indian Metros
-    }
-    return 0.40 // Standard Indian Cultural & Nature Sanctuaries
-  }
-
-  // Southeast Asia
-  if (
-    d.includes("thailand") || d.includes("vietnam") || d.includes("indonesia") ||
-    d.includes("bali") || d.includes("philippines") || d.includes("cambodia") ||
-    d.includes("laos") || d.includes("malaysia")
-  ) {
-    return 0.50
-  }
-
-  // Ultra-High Cost Global Capitals & Alpine Escapes
-  if (
-    d.includes("switzerland") || d.includes("zürich") || d.includes("geneva") ||
-    d.includes("zermatt") || d.includes("norway") || d.includes("iceland") ||
-    d.includes("new york") || d.includes("san francisco") || d.includes("singapore") ||
-    d.includes("dubai") || d.includes("monaco")
-  ) {
-    return 1.35
-  }
-
-  // Japan & East Asia
-  if (
-    d.includes("japan") || d.includes("tokyo") || d.includes("kyoto") ||
-    d.includes("osaka") || d.includes("korea") || d.includes("seoul")
-  ) {
-    return 0.95
-  }
-
-  // Southern / Eastern Europe, Latin America, Middle East
-  if (
-    d.includes("mexico") || d.includes("peru") || d.includes("colombia") ||
-    d.includes("brazil") || d.includes("argentina") || d.includes("portugal") ||
-    d.includes("greece") || d.includes("turkey") || d.includes("morocco") ||
-    d.includes("egypt") || d.includes("spain") || d.includes("italy")
-  ) {
-    return 0.85
-  }
-
-  // Western Europe / North America standard benchmark
-  return 1.00
-}
-
 export interface BudgetItemDetail {
-  key: "stays" | "food" | "activities" | "transit"
   category: "Stays" | "Gastronomy" | "Experiences & Entry" | "Transit & Fuel"
   title: string
   dailyPerPerson: number
@@ -115,37 +49,31 @@ export interface BudgetItemDetail {
 }
 
 export interface DetailedTripBudget {
+  destination?: string
   currency: CurrencyCode
   symbol: string
   durationDays: number
   travelers: number
   budgetTier: BudgetTier
-  regionalMultiplier: number
-
-  // ─── Per-Person Calculations ───
-  dailyCostPerPerson: number       // Base daily cadence per traveler
-  dailyAveragePerPerson: number    // Alias for backwards compatibility
-  totalPerPerson: number           // dailyCostPerPerson * durationDays
-  dailyMinPerPerson: number        // -15% daily per person lower bound
-  dailyMaxPerPerson: number        // +20% daily per person upper bound
-
-  // ─── Group Total Calculations ───
-  totalTripCost: number            // totalPerPerson * travelers
-  totalGroup: number               // Alias for backwards compatibility (totalTripCost)
-  dailyCostGroup: number           // dailyCostPerPerson * travelers
-  totalMinGroup: number            // -15% total group lower bound
-  totalMaxGroup: number            // +20% total group upper bound
-  rangeMinGroup: number            // Alias for backwards compatibility (totalMinGroup)
-  rangeMaxGroup: number            // Alias for backwards compatibility (totalMaxGroup)
-
-  // ─── Categories & Visual Telemetry ───
+  // Per-person figures
+  dailyAveragePerPerson: number
+  totalPerPerson: number
+  rangeMinDailyPerPerson: number
+  rangeMaxDailyPerPerson: number
+  // Group figures
+  dailyGroup: number
+  totalGroup: number
+  rangeMinGroup: number
+  rangeMaxGroup: number
+  // Itemized breakdown (Sum of category totalGroup === totalGroup exactly)
   breakdown: BudgetItemDetail[]
-  costBreakdownPercentages: [number, number, number, number] // [42, 28, 18, 12] summing to 100%
-
+  costBreakdownPercentages: [number, number, number, number] // [Stays, Food, Experiences, Transit] sum to 100
+  // Telemetry metadata
+  baseDailyUsd: number
+  fxRate: number
+  isEstimate: boolean
   dataSource: string
   disclaimer: string
-  assumptions: string
-  isEstimated: boolean
   lastUpdated: string
 }
 
@@ -154,13 +82,70 @@ export interface BudgetInputParams {
   days: number
   travelers?: number
   budgetTier?: BudgetTier | string
-  currency?: CurrencyCode | string
+  currency?: CurrencyCode
   customDailyRateUsd?: number
 }
 
+/**
+ * Determine a realistic USD daily rate baseline per person based on destination and tier.
+ * Never hardcodes city-specific prices, but respects regional purchasing power.
+ */
+function resolveBaseDailyUsd(destination: string | undefined, tier: BudgetTier, currency: CurrencyCode): number {
+  const destLower = (destination || "").toLowerCase()
+  
+  // Detect domestic India context (either destination mentions India/states or user defaults to INR without explicit overseas dest)
+  const isIndianSubcontinent =
+    destLower.includes("india") ||
+    destLower.includes("pune") ||
+    destLower.includes("mumbai") ||
+    destLower.includes("delhi") ||
+    destLower.includes("bangalore") ||
+    destLower.includes("bengaluru") ||
+    destLower.includes("kolhapur") ||
+    destLower.includes("goa") ||
+    destLower.includes("kerala") ||
+    destLower.includes("rajasthan") ||
+    destLower.includes("jaipur") ||
+    destLower.includes("maharashtra") ||
+    destLower.includes("himalaya") ||
+    destLower.includes("manali") ||
+    destLower.includes("varanasi") ||
+    destLower.includes("agra")
+
+  if (isIndianSubcontinent) {
+    // Realistic Indian domestic tourism norms (~₹2,000–₹12,000 / day / person in INR)
+    switch (tier) {
+      case "budget":
+        return 25 // ~₹2,160 / day per person
+      case "moderate":
+        return 50 // ~₹4,325 / day per person
+      case "luxury":
+        return 140 // ~₹12,110 / day per person
+      case "ultra-luxury":
+        return 320 // ~₹27,680 / day per person
+    }
+  }
+
+  // Western Europe / North America / Japan / Global international baseline
+  switch (tier) {
+    case "budget":
+      return 65
+    case "moderate":
+      return 135
+    case "luxury":
+      return 340
+    case "ultra-luxury":
+      return 850
+  }
+}
+
+/**
+ * Deterministic Travel Budget Calculation Engine
+ * Acts as the SINGLE SOURCE OF TRUTH for all budget numbers across AERIS.
+ */
 export function calculateTripBudget(params: BudgetInputParams): DetailedTripBudget {
   const {
-    destination = "",
+    destination,
     days = 3,
     travelers = 2,
     budgetTier: rawTier = "moderate",
@@ -168,174 +153,145 @@ export function calculateTripBudget(params: BudgetInputParams): DetailedTripBudg
     customDailyRateUsd,
   } = params
 
-  const durationDays = Math.max(1, Math.min(30, Math.round(Number(days)) || 3))
-  const travelerCount = Math.max(1, Math.min(20, Math.round(Number(travelers)) || 2))
+  const durationDays = Math.max(1, Math.min(60, Math.round(Number(days) || 3)))
+  const travelerCount = Math.max(1, Math.min(30, Math.round(Number(travelers) || 2)))
 
   const tier: BudgetTier =
     rawTier === "budget" || rawTier === "luxury" || rawTier === "ultra-luxury"
       ? (rawTier as BudgetTier)
       : "moderate"
 
-  // 1. Base USD daily benchmark per tier
-  let tierBaseUsd: number
-  if (customDailyRateUsd && customDailyRateUsd > 10) {
-    tierBaseUsd = customDailyRateUsd
+  // Base daily rate in USD per person
+  let baseDailyUsd: number
+  if (customDailyRateUsd && customDailyRateUsd >= 15 && customDailyRateUsd <= 5000) {
+    baseDailyUsd = customDailyRateUsd
   } else {
-    switch (tier) {
-      case "budget":
-        tierBaseUsd = 50
-        break
-      case "moderate":
-        tierBaseUsd = 120
-        break
-      case "luxury":
-        tierBaseUsd = 320
-        break
-      case "ultra-luxury":
-        tierBaseUsd = 750
-        break
-    }
+    baseDailyUsd = resolveBaseDailyUsd(destination, tier, currency)
   }
 
-  // 2. Adjust for destination cost of living / regional parity index
-  const regionalMultiplier = getRegionalCostFactor(destination)
-  const effectiveDailyUsd = tierBaseUsd * regionalMultiplier
+  const fxRate = FX_RATES_FROM_USD[currency] || 1.0
+  const symbol = CURRENCY_SYMBOLS[currency] || "$"
 
-  // 3. FX Rate Conversion
-  const validCurrency: CurrencyCode = FX_RATES_FROM_USD[currency as CurrencyCode]
-    ? (currency as CurrencyCode)
-    : "USD"
-  const fxRate = FX_RATES_FROM_USD[validCurrency]
-  const symbol = CURRENCY_SYMBOLS[validCurrency]
+  // 1. Single core unit: Daily cost per person in target currency
+  const dailyAveragePerPerson = Math.max(1, Math.round(baseDailyUsd * fxRate))
 
-  // 4. Exact Integer Per-Person Calculations in Target Currency
-  const dailyCostPerPerson = Math.max(1, Math.round(effectiveDailyUsd * fxRate))
-  const totalPerPerson = dailyCostPerPerson * durationDays
+  // 2. Strict mathematical derivatives
+  const totalPerPerson = dailyAveragePerPerson * durationDays
+  const totalGroup = totalPerPerson * travelerCount
+  const dailyGroup = dailyAveragePerPerson * travelerCount
 
-  // 5. Exact Integer Group Total Calculations
-  const totalTripCost = totalPerPerson * travelerCount
-  const dailyCostGroup = dailyCostPerPerson * travelerCount
+  // 3. Proportional realistic ranges (-15% to +20%)
+  const rangeMinDailyPerPerson = Math.round(dailyAveragePerPerson * 0.85)
+  const rangeMaxDailyPerPerson = Math.round(dailyAveragePerPerson * 1.20)
+  const rangeMinGroup = rangeMinDailyPerPerson * durationDays * travelerCount
+  const rangeMaxGroup = rangeMaxDailyPerPerson * durationDays * travelerCount
 
-  // 6. Range bounds: explicit daily bounds for daily display, total bounds for trip summary
-  const dailyMinPerPerson = Math.max(1, Math.round(dailyCostPerPerson * 0.85))
-  const dailyMaxPerPerson = Math.max(dailyMinPerPerson + 1, Math.round(dailyCostPerPerson * 1.20))
-  const totalMinGroup = Math.max(1, Math.round(totalTripCost * 0.85))
-  const totalMaxGroup = Math.max(totalMinGroup + 1, Math.round(totalTripCost * 1.20))
-
-  // 7. Category Allocations (Stays: 42%, Food: 28%, Experiences: 18%, Transit: 12%)
-  // Residual allocation on Transit guarantees exact sum === totalTripCost with 0 rounding drift
-  const staysPct = 42
+  // 4. Category percentage allocations (Must strictly sum to 100%)
+  const stayPct = 42
   const foodPct = 28
   const expPct = 18
-  const transitPct = 12
+  const transitPct = 12 // 42 + 28 + 18 + 12 = 100
 
-  const staysGroup = Math.round((totalTripCost * staysPct) / 100)
-  const foodGroup = Math.round((totalTripCost * foodPct) / 100)
-  const expGroup = Math.round((totalTripCost * expPct) / 100)
-  const transitGroup = totalTripCost - (staysGroup + foodGroup + expGroup)
+  // 5. Category daily calculations per person
+  const staysDaily = Math.round((dailyAveragePerPerson * stayPct) / 100)
+  const foodDaily = Math.round((dailyAveragePerPerson * foodPct) / 100)
+  const expDaily = Math.round((dailyAveragePerPerson * expPct) / 100)
+  // Exact remainder guarantee for daily per person
+  const transitDaily = dailyAveragePerPerson - (staysDaily + foodDaily + expDaily)
+
+  // 6. Category group totals (Exact remainder guarantee to prevent integer drift)
+  const staysGroup = staysDaily * durationDays * travelerCount
+  const foodGroup = foodDaily * durationDays * travelerCount
+  const expGroup = expDaily * durationDays * travelerCount
+  // Exact remainder guarantee: Sum of all 4 group totals ALWAYS strictly equals totalGroup
+  const transitGroup = totalGroup - (staysGroup + foodGroup + expGroup)
 
   const breakdown: BudgetItemDetail[] = [
     {
-      key: "stays",
       category: "Stays",
       title:
-        tier === "ultra-luxury"
-          ? "Palatial Heritage Villas & 5★ Sanctuaries"
-          : tier === "luxury"
-          ? "Boutique Heritage Suites & Luxury Resorts"
+        tier === "luxury" || tier === "ultra-luxury"
+          ? "Boutique Heritage Suites & Villas"
           : tier === "budget"
-          ? "Clean Boutique Hostels & Heritage Guesthouses"
-          : "Selected 3–4★ Curated Hotels",
-      dailyPerPerson: Math.round(staysGroup / travelerCount / durationDays),
-      totalPerPerson: Math.round(staysGroup / travelerCount),
+          ? "Comfort Hostels & Guesthouses"
+          : "Selected 3-4★ Boutique Hotels",
+      dailyPerPerson: staysDaily,
+      totalPerPerson: staysDaily * durationDays,
       totalGroup: staysGroup,
-      percentage: staysPct,
-      assumptions: "Double-occupancy room basis with breakfast and amenities included.",
+      percentage: stayPct,
+      assumptions: "Double-occupancy room basis with breakfast included.",
     },
     {
-      key: "food",
       category: "Gastronomy",
-      title: "Daily Meals, Authentic Cafes & Street Salons",
-      dailyPerPerson: Math.round(foodGroup / travelerCount / durationDays),
-      totalPerPerson: Math.round(foodGroup / travelerCount),
+      title: "Daily Meals, Authentic Cafes & Beverages",
+      dailyPerPerson: foodDaily,
+      totalPerPerson: foodDaily * durationDays,
       totalGroup: foodGroup,
       percentage: foodPct,
-      assumptions: "Three daily meals featuring authentic regional specialties, tea/coffee stops, and snacks.",
+      assumptions: "3 daily meals featuring authentic regional specialties and local cafes.",
     },
     {
-      key: "activities",
       category: "Experiences & Entry",
-      title: "Attraction Admissions, Temple Permits & Guides",
-      dailyPerPerson: Math.round(expGroup / travelerCount / durationDays),
-      totalPerPerson: Math.round(expGroup / travelerCount),
+      title: "Attraction Admissions, Permits & Shrines",
+      dailyPerPerson: expDaily,
+      totalPerPerson: expDaily * durationDays,
       totalGroup: expGroup,
       percentage: expPct,
-      assumptions: "Standard adult entry passes for core viewpoint parks, heritage forts, museums, and shrines.",
+      assumptions: "Standard adult admissions for core viewpoints, heritage monuments, and parks.",
     },
     {
-      key: "transit",
       category: "Transit & Fuel",
-      title: "Local Cabs, Fuel, Tolls & Transfers",
-      dailyPerPerson: Math.round(transitGroup / travelerCount / durationDays),
-      totalPerPerson: Math.round(transitGroup / travelerCount),
+      title: "Local Cabs, Fuel, Parking & Transit",
+      dailyPerPerson: transitDaily,
+      totalPerPerson: transitDaily * durationDays,
       totalGroup: transitGroup,
       percentage: transitPct,
-      assumptions: "Local transfers, auto/cab fares, parking fees, and route tolls.",
+      assumptions: "Local transfers, scenic route vehicle hire, and parking tolls.",
     },
   ]
 
   return {
-    currency: validCurrency,
+    destination,
+    currency,
     symbol,
     durationDays,
     travelers: travelerCount,
     budgetTier: tier,
-    regionalMultiplier,
-    dailyCostPerPerson,
-    dailyAveragePerPerson: dailyCostPerPerson,
+    dailyAveragePerPerson,
     totalPerPerson,
-    dailyMinPerPerson,
-    dailyMaxPerPerson,
-    totalTripCost,
-    totalGroup: totalTripCost,
-    dailyCostGroup,
-    totalMinGroup,
-    totalMaxGroup,
-    rangeMinGroup: totalMinGroup,
-    rangeMaxGroup: totalMaxGroup,
+    dailyGroup,
+    totalGroup,
+    rangeMinDailyPerPerson,
+    rangeMaxDailyPerPerson,
+    rangeMinGroup,
+    rangeMaxGroup,
     breakdown,
-    costBreakdownPercentages: [staysPct, foodPct, expPct, transitPct],
+    costBreakdownPercentages: [stayPct, foodPct, expPct, transitPct],
+    baseDailyUsd,
+    fxRate,
+    isEstimate: true,
     dataSource: "AERIS Curated Telemetry & Statistical Norms",
     disclaimer:
       "All figures represent realistic market estimates. Actual expenses fluctuate with seasonal demand, advance bookings, and local choices. Not a confirmed reservation price.",
-    assumptions: `Based on ${travelerCount} traveler(s) for ${durationDays} day(s) at ${tier} tier with double occupancy.`,
-    isEstimated: true,
     lastUpdated: new Date().toISOString().split("T")[0],
   }
 }
 
 /**
- * Deterministically converts a DetailedTripBudget to another currency.
- * Guarantees zero float drift and prevents double multiplication.
+ * Seamless Currency Recalculator
+ * Takes an existing DetailedTripBudget and converts it to a new target currency
+ * using the preserved baseDailyUsd rate, ensuring zero compounding drift.
  */
-export function convertBudget(
-  sourceBudget: DetailedTripBudget,
-  targetCurrency: CurrencyCode | string,
-  destination?: string
+export function recalculateBudget(
+  existingBudget: DetailedTripBudget,
+  targetCurrency: CurrencyCode
 ): DetailedTripBudget {
-  const validTarget: CurrencyCode = FX_RATES_FROM_USD[targetCurrency as CurrencyCode]
-    ? (targetCurrency as CurrencyCode)
-    : "USD"
-
-  if (sourceBudget.currency === validTarget) {
-    return sourceBudget
-  }
-
   return calculateTripBudget({
-    destination,
-    days: sourceBudget.durationDays,
-    travelers: sourceBudget.travelers,
-    budgetTier: sourceBudget.budgetTier,
-    currency: validTarget,
+    destination: existingBudget.destination,
+    days: existingBudget.durationDays,
+    travelers: existingBudget.travelers,
+    budgetTier: existingBudget.budgetTier,
+    currency: targetCurrency,
+    customDailyRateUsd: existingBudget.baseDailyUsd,
   })
 }

@@ -10,7 +10,8 @@ import {
   ChartData,
   ChartOptions,
 } from "chart.js"
-import { DollarSign, PieChart, Sparkles } from "lucide-react"
+import { PieChart } from "lucide-react"
+import { DetailedTripBudget } from "@/lib/budget/budget-calculator"
 
 // Register required Chart.js controllers and elements
 if (typeof window !== "undefined") {
@@ -18,26 +19,35 @@ if (typeof window !== "undefined") {
 }
 
 interface BudgetDoughnutProps {
-  costBreakdown: [number, number, number, number] // [Stays, Gastronomy, Experiences, Transit]
-  dailyCost: number
-  budgetMin: number
-  budgetMax: number
+  budgetTelemetry?: DetailedTripBudget
+  costBreakdown?: [number, number, number, number] // [Stays, Gastronomy, Experiences, Transit]
+  dailyCost?: number
+  budgetMin?: number
+  budgetMax?: number
   currency?: string
   currencySymbol?: string
 }
 
 export function BudgetDoughnutChart({
-  costBreakdown = [45, 30, 15, 10],
-  dailyCost = 130,
-  budgetMin = 80,
-  budgetMax = 200,
-  currency = "USD",
-  currencySymbol = "$",
+  budgetTelemetry,
+  costBreakdown: propBreakdown = [42, 28, 18, 12],
+  dailyCost: propDaily = 130,
+  budgetMin: propMin = 80,
+  budgetMax: propMax = 200,
+  currency: propCurrency = "USD",
+  currencySymbol: propSymbol = "$",
 }: BudgetDoughnutProps) {
   const canvasRef = React.useRef<HTMLCanvasElement | null>(null)
   const chartInstanceRef = React.useRef<ChartJS<"doughnut"> | null>(null)
 
-  const labels = ["Boutique Stays", "Gastronomy & Salons", "Private Access", "Transit & Rail"]
+  // Derive all data from single source of truth budgetTelemetry if available
+  const dailyCost = budgetTelemetry?.dailyAveragePerPerson ?? propDaily
+  const budgetMin = budgetTelemetry?.rangeMinDailyPerPerson ?? propMin
+  const budgetMax = budgetTelemetry?.rangeMaxDailyPerPerson ?? propMax
+  const costBreakdown = budgetTelemetry?.costBreakdownPercentages ?? propBreakdown
+  const currencySymbol = budgetTelemetry?.symbol ?? propSymbol
+
+  const labels = ["Boutique Stays", "Gastronomy & Dining", "Admissions & Entry", "Transit & Rail"]
   const colors = [
     "rgba(232, 213, 181, 0.95)", // Champagne Gold
     "rgba(56, 189, 248, 0.92)",  // Sky Cyan
@@ -51,10 +61,10 @@ export function BudgetDoughnutChart({
     "#cbd5e1",
   ]
 
-  // Calculate approximate daily amount per category
-  const categoryAmounts = costBreakdown.map((percent) =>
-    Math.round((dailyCost * percent) / 100)
-  )
+  // Category daily amounts per person (exact from breakdown if telemetry provided, else proportional)
+  const categoryAmounts = budgetTelemetry?.breakdown
+    ? budgetTelemetry.breakdown.map((b) => b.dailyPerPerson)
+    : costBreakdown.map((percent) => Math.round((dailyCost * percent) / 100))
 
   React.useEffect(() => {
     if (!canvasRef.current) return
@@ -109,7 +119,7 @@ export function BudgetDoughnutChart({
               const idx = context.dataIndex
               const percent = costBreakdown[idx]
               const amount = categoryAmounts[idx]
-              return ` ${percent}% (${currencySymbol}${amount} / day)`
+              return ` ${percent}% (${currencySymbol}${amount.toLocaleString()} / day)`
             },
           },
         },
@@ -127,11 +137,11 @@ export function BudgetDoughnutChart({
         chartInstanceRef.current.destroy()
       }
     }
-  }, [costBreakdown, dailyCost, currencySymbol])
+  }, [costBreakdown, dailyCost, currencySymbol, categoryAmounts])
 
   return (
     <div className="glass-shell rounded-3xl p-5 sm:p-6 border border-white/10 space-y-4">
-      {/* Title & Telemetry Range */}
+      {/* Title & Telemetry Daily Range */}
       <div className="flex items-center justify-between border-b border-white/10 pb-3">
         <div className="flex items-center gap-2">
           <PieChart className="w-4 h-4 text-[#38bdf8]" />
@@ -157,12 +167,12 @@ export function BudgetDoughnutChart({
             {currencySymbol}{dailyCost.toLocaleString()}
           </div>
           <span className="text-[10px] text-[#38bdf8] font-mono">
-            per traveler / day
+            per traveler
           </span>
         </div>
       </div>
 
-      {/* Segment Legend with Percentages & Dollar Amounts */}
+      {/* Segment Legend with Percentages & Daily Amounts */}
       <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
         {labels.map((label, idx) => (
           <div
@@ -181,7 +191,7 @@ export function BudgetDoughnutChart({
                 {costBreakdown[idx]}%
               </span>
               <span className="text-[10px] text-slate-400 block font-mono">
-                {currencySymbol}{categoryAmounts[idx].toLocaleString()} / day
+                {currencySymbol}{categoryAmounts[idx]?.toLocaleString()}
               </span>
             </div>
           </div>
@@ -190,4 +200,3 @@ export function BudgetDoughnutChart({
     </div>
   )
 }
-

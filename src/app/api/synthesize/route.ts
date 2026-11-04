@@ -348,10 +348,9 @@ Provide a concise, practical weather briefing for travelers (including what clot
 The user is asking about the cost or budget for a trip to "${targetPlace}".
 Calculated Itemized Projections:
 - Currency: ${budgetData.currency} (${budgetData.symbol})
-- Total for ${resolvedTravelers} traveler(s) over ${resolvedDays} days: ${budgetData.symbol}${budgetData.totalTripCost.toLocaleString()}
-- Daily Average per person: ${budgetData.symbol}${budgetData.dailyCostPerPerson.toLocaleString()}
-- Total Trip Range: ${budgetData.symbol}${budgetData.totalMinGroup.toLocaleString()} — ${budgetData.symbol}${budgetData.totalMaxGroup.toLocaleString()}
-- Daily Cadence Range: ${budgetData.symbol}${budgetData.dailyMinPerPerson.toLocaleString()} — ${budgetData.symbol}${budgetData.dailyMaxPerPerson.toLocaleString()} / person / day
+- Total for ${resolvedTravelers} traveler(s) over ${resolvedDays} days: ${budgetData.symbol}${budgetData.totalGroup.toLocaleString()}
+- Daily Average per person: ${budgetData.symbol}${budgetData.dailyAveragePerPerson.toLocaleString()}
+- Estimated Range: ${budgetData.symbol}${budgetData.rangeMinGroup.toLocaleString()} — ${budgetData.symbol}${budgetData.rangeMaxGroup.toLocaleString()}
 - Categories: Stays (${budgetData.breakdown[0].percentage}%), Gastronomy (${budgetData.breakdown[1].percentage}%), Experiences (${budgetData.breakdown[2].percentage}%), Transit/Fuel (${budgetData.breakdown[3].percentage}%)
 
 Explain the itemized budget clearly to the user with realistic assumptions. State that figures represent estimated market norms rather than confirmed booking rates.`
@@ -407,6 +406,20 @@ Return ONLY pure valid JSON matching the exact SynthesizedItinerary schema. Do N
       const validated = validateItinerary(parsed.itinerary)
 
       if (validated) {
+        // Enforce deterministic Single Source of Truth for modified itinerary
+        const modBudget = calculateTripBudget({
+          destination: activeItinerary.name,
+          days: validated.days.length,
+          travelers: resolvedTravelers,
+          budgetTier: resolvedBudgetTier,
+          currency: currency as CurrencyCode,
+        })
+        validated.budgetTelemetry = modBudget
+        validated.dailyCost = modBudget.dailyAveragePerPerson
+        validated.budgetMin = modBudget.rangeMinDailyPerPerson
+        validated.budgetMax = modBudget.rangeMaxDailyPerPerson
+        validated.costBreakdown = modBudget.costBreakdownPercentages
+
         return NextResponse.json({
           success: true,
           intent,
@@ -494,9 +507,9 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
   "category": "Nature | Culture | Beach | Adventure | City",
   "rating": 4.9,
   "duration": "${resolvedDays} days",
-  "budgetMin": ${budgetTelemetry.dailyMinPerPerson},
-  "budgetMax": ${budgetTelemetry.dailyMaxPerPerson},
-  "dailyCost": ${budgetTelemetry.dailyCostPerPerson},
+  "budgetMin": ${budgetTelemetry.rangeMinDailyPerPerson},
+  "budgetMax": ${budgetTelemetry.rangeMaxDailyPerPerson},
+  "dailyCost": ${budgetTelemetry.dailyAveragePerPerson},
   "season": "Peak Travel Months",
   "description": "2-3 sentences of evocative editorial prose capturing the destination's atmospheric essence, terrain, and spirit.",
   "highlights": ["Authentic Highlight 1", "Authentic Highlight 2", "Authentic Highlight 3", "Authentic Highlight 4"],
@@ -553,13 +566,13 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
       )
     }
 
-    // Attach deterministic telemetry & enforce single source of truth
+    // Attach deterministic telemetry - SINGLE SOURCE OF TRUTH
     validated.coordinates = destCoordinates
     validated.weather = liveWeather
     validated.budgetTelemetry = budgetTelemetry
-    validated.dailyCost = budgetTelemetry.dailyCostPerPerson
-    validated.budgetMin = budgetTelemetry.dailyMinPerPerson
-    validated.budgetMax = budgetTelemetry.dailyMaxPerPerson
+    validated.dailyCost = budgetTelemetry.dailyAveragePerPerson
+    validated.budgetMin = budgetTelemetry.rangeMinDailyPerPerson
+    validated.budgetMax = budgetTelemetry.rangeMaxDailyPerPerson
     validated.costBreakdown = budgetTelemetry.costBreakdownPercentages
 
     // Attempt to calculate real road network routing for Day 1 stops if coordinates are available
