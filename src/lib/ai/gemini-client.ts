@@ -10,9 +10,8 @@
 
 const CANDIDATE_MODELS = [
   "gemini-3.5-flash-lite",
-  "gemini-3.1-flash-lite",
   "gemini-3.5-flash",
-  "gemini-3.8-flash",
+  "gemini-3.6-flash",
 ]
 
 export interface GeminiCallParams {
@@ -108,14 +107,13 @@ export async function callGemini(params: GeminiCallParams): Promise<GeminiCallRe
         lastError = { status, message: errMsg }
 
         // If key is invalid, break immediately
-        if (status === 400 || status === 401 || status === 403) {
+        if (status === 401 || status === 403) {
           throw new Error(`Authentication error (${status}): ${errMsg}`)
         }
 
-        // 404 (model deprecated), 429 (rate limit), 503 (high demand) -> continue to next model
-        if (status === 404 || status === 429 || status === 503) {
-          continue
-        }
+        // For any model error (404 deprecated, 429 rate limit, 503 high demand, 500 server error, or 400 bad model request), continue to next candidate
+        console.warn(`[Gemini Client] Model ${model} returned ${status}: ${errMsg}. Falling back to next candidate model...`)
+        continue
       }
     } catch (err: any) {
       if (err.name === "AbortError") {
@@ -125,6 +123,7 @@ export async function callGemini(params: GeminiCallParams): Promise<GeminiCallRe
       } else {
         lastError = { status: 500, message: err.message || "Network error" }
       }
+      console.warn(`[Gemini Client] Model ${model} failed: ${err.message}. Trying next candidate model...`)
     }
   }
 

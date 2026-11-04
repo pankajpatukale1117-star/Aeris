@@ -634,7 +634,7 @@ You MUST respond with ONLY a valid, parseable JSON object matching this schema. 
       systemPrompt: planningPrompt,
       responseMimeType: "application/json",
       overrideKey: activeKey,
-      timeoutMs: 18000,
+      timeoutMs: 25000,
     })
 
     const parsed = cleanAndParseGeminiResponse(synthesisResult.text)
