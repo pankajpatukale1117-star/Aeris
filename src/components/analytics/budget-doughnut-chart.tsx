@@ -22,7 +22,7 @@ interface BudgetDoughnutProps {
   dailyCost: number
   budgetMin: number
   budgetMax: number
-  currency?: "USD" | "INR" | "EUR" | "JPY"
+  currency?: string
   currencySymbol?: string
 }
 
@@ -140,7 +140,7 @@ export function BudgetDoughnutChart({
           </span>
         </div>
         <span className="text-[11px] font-mono text-[#e8d5b5]">
-          {currencySymbol}{budgetMin} — {currencySymbol}{budgetMax} / day
+          {currencySymbol}{budgetMin.toLocaleString()} — {currencySymbol}{budgetMax.toLocaleString()} / day
         </span>
       </div>
 
@@ -154,10 +154,10 @@ export function BudgetDoughnutChart({
             Est. Daily Cadence
           </span>
           <div className="font-editorial text-2xl sm:text-3xl font-bold text-white mt-0.5 tracking-tight">
-            {currencySymbol}{dailyCost}
+            {currencySymbol}{dailyCost.toLocaleString()}
           </div>
           <span className="text-[10px] text-[#38bdf8] font-mono">
-            per traveler
+            per traveler / day
           </span>
         </div>
       </div>
@@ -181,7 +181,7 @@ export function BudgetDoughnutChart({
                 {costBreakdown[idx]}%
               </span>
               <span className="text-[10px] text-slate-400 block font-mono">
-                {currencySymbol}{categoryAmounts[idx]}
+                {currencySymbol}{categoryAmounts[idx].toLocaleString()} / day
               </span>
             </div>
           </div>

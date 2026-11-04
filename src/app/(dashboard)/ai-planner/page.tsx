@@ -43,17 +43,23 @@ import { useGeminiStore } from "@/lib/gemini-store"
 import { DESTINATIONS } from "@/lib/constants"
 import { SynthesizedItinerary } from "@/app/api/synthesize/route"
 import { BudgetDoughnutChart } from "@/components/analytics/budget-doughnut-chart"
+import {
+  calculateTripBudget,
+  convertBudget,
+  DetailedTripBudget,
+  CurrencyCode,
+  FX_RATES_FROM_USD,
+  CURRENCY_SYMBOLS,
+} from "@/lib/budget/budget-calculator"
 import { TripMap, MapPoint } from "@/components/map/trip-map"
 import { InteractiveGlobe } from "@/components/globe/interactive-globe"
 import { Globe } from "lucide-react"
 
-type CurrencyCode = "USD" | "INR" | "EUR" | "JPY"
-
 const CURRENCIES: Array<{ code: CurrencyCode; symbol: string; rate: number; label: string }> = [
-  { code: "USD", symbol: "$", rate: 1, label: "USD ($)" },
-  { code: "INR", symbol: "₹", rate: 85, label: "INR (₹)" },
-  { code: "EUR", symbol: "€", rate: 0.92, label: "EUR (€)" },
-  { code: "JPY", symbol: "¥", rate: 155, label: "JPY (¥)" },
+  { code: "USD", symbol: CURRENCY_SYMBOLS.USD, rate: FX_RATES_FROM_USD.USD, label: "USD ($)" },
+  { code: "INR", symbol: CURRENCY_SYMBOLS.INR, rate: FX_RATES_FROM_USD.INR, label: "INR (₹)" },
+  { code: "EUR", symbol: CURRENCY_SYMBOLS.EUR, rate: FX_RATES_FROM_USD.EUR, label: "EUR (€)" },
+  { code: "JPY", symbol: CURRENCY_SYMBOLS.JPY, rate: FX_RATES_FROM_USD.JPY, label: "JPY (¥)" },
 ]
 
 const CURATORIAL_LENSES = [
@@ -228,9 +234,25 @@ function AIPlannerContent() {
     }
   }, [loading])
 
-  // Currency Converter Helpers
+  // Currency & Single Source of Truth Deterministic Budget
   const activeCurrencyConfig = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]
-  const convertAmount = (usdAmount: number) => Math.round(usdAmount * activeCurrencyConfig.rate)
+
+  const activeBudget = React.useMemo<DetailedTripBudget | null>(() => {
+    if (!itinerary) return null
+    if (itinerary.budgetTelemetry) {
+      if (itinerary.budgetTelemetry.currency === currency) {
+        return itinerary.budgetTelemetry
+      }
+      return convertBudget(itinerary.budgetTelemetry, currency, itinerary.name)
+    }
+    return calculateTripBudget({
+      destination: itinerary.name,
+      days: itinerary.days?.length || days,
+      travelers: 2,
+      budgetTier: "moderate",
+      currency,
+    })
+  }, [itinerary, currency, days])
 
   // Core Multi-Turn Synthesize / Mutate Executor
   const executeMultiTurnQuery = async (params: {
@@ -458,7 +480,9 @@ function AIPlannerContent() {
       status: "upcoming",
       planningMode: "AI Architecture",
       daysCount: itinerary.days.length,
-      budget: `${activeCurrencyConfig.symbol}${convertAmount(itinerary.budgetMin)} — ${activeCurrencyConfig.symbol}${convertAmount(itinerary.budgetMax)} / day`,
+      budget: activeBudget
+        ? `${activeBudget.symbol}${activeBudget.dailyMinPerPerson.toLocaleString()} — ${activeBudget.symbol}${activeBudget.dailyMaxPerPerson.toLocaleString()} / day`
+        : `${activeCurrencyConfig.symbol}${itinerary.dailyCost.toLocaleString()} / day`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       days: itinerary.days.map((d) => ({
@@ -473,7 +497,9 @@ function AIPlannerContent() {
           description: `${s.note} (${s.dist})`,
           duration: "2.5h",
           location: s.dist,
-          estimatedCost: s.reserved ? `${activeCurrencyConfig.symbol}${convertAmount(75)}` : "Complimentary",
+          estimatedCost: s.reserved
+            ? `${activeBudget ? activeBudget.symbol : activeCurrencyConfig.symbol}${activeBudget ? Math.round(activeBudget.dailyCostPerPerson * 0.25).toLocaleString() : "50"}`
+            : "Complimentary",
           category: idx === 0 ? "Cultural" : idx === 1 ? "Food" : "Relaxation",
         })),
       })),
@@ -490,7 +516,11 @@ function AIPlannerContent() {
   // Copy Itinerary Text
   const handleCopyItinerary = () => {
     if (!itinerary) return
-    const textSummary = `AERIS Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${activeCurrencyConfig.symbol}${convertAmount(itinerary.dailyCost)} / day\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
+    const dailyDisplay = activeBudget
+      ? `${activeBudget.symbol}${activeBudget.dailyCostPerPerson.toLocaleString()} / day`
+      : `${activeCurrencyConfig.symbol}${itinerary.dailyCost.toLocaleString()} / day`
+
+    const textSummary = `AERIS Bespoke Itinerary: ${itinerary.name} (${itinerary.region})\nDuration: ${itinerary.duration}\nSeason: ${itinerary.season}\nEstimated Daily Cadence: ${dailyDisplay}\n\n${itinerary.description}\n\nHighlights:\n${itinerary.highlights.map((h) => `• ${h}`).join("\n")}\n\nCircadian Timeline:\n${itinerary.days.map((d) => `Day ${d.day} — ${d.theme}:\n${d.stops.map((s) => `  ${s.slot}: ${s.title} (${s.note} • ${s.dist})`).join("\n")}`).join("\n\n")}`
     navigator.clipboard.writeText(textSummary)
     toast({
       title: "Copied to Clipboard",
@@ -880,14 +910,14 @@ function AIPlannerContent() {
           </form>
 
           {/* Live Chart.js Budget Telemetry Doughnut Chart */}
-          {itinerary && (
+          {itinerary && activeBudget && (
             <BudgetDoughnutChart
-              costBreakdown={itinerary.costBreakdown}
-              dailyCost={convertAmount(itinerary.dailyCost)}
-              budgetMin={convertAmount(itinerary.budgetMin)}
-              budgetMax={convertAmount(itinerary.budgetMax)}
-              currency={currency}
-              currencySymbol={activeCurrencyConfig.symbol}
+              costBreakdown={activeBudget.costBreakdownPercentages}
+              dailyCost={activeBudget.dailyCostPerPerson}
+              budgetMin={activeBudget.dailyMinPerPerson}
+              budgetMax={activeBudget.dailyMaxPerPerson}
+              currency={activeBudget.currency}
+              currencySymbol={activeBudget.symbol}
             />
           )}
         </div>
@@ -1041,7 +1071,9 @@ function AIPlannerContent() {
                   <div className="glass-card p-3 rounded-2xl">
                     <div className="text-[10px] uppercase text-slate-400 tracking-wider">Est. Daily Cadence</div>
                     <div className="text-xs font-semibold text-[#38bdf8] mt-1 font-mono">
-                      {activeCurrencyConfig.symbol}{convertAmount(itinerary.dailyCost)} / day
+                      {activeBudget
+                        ? `${activeBudget.symbol}${activeBudget.dailyCostPerPerson.toLocaleString()} / day`
+                        : `${activeCurrencyConfig.symbol}${itinerary.dailyCost.toLocaleString()} / day`}
                     </div>
                   </div>
                 </div>
@@ -1111,32 +1143,32 @@ function AIPlannerContent() {
                   </div>
                 </div>
 
-                {/* Realistic Budget Engine Projections */}
-                {itinerary.budgetTelemetry && (
+                {/* Realistic Budget Engine Projections (Single Source of Truth) */}
+                {activeBudget && (
                   <div className="glass-shell p-5 rounded-2xl border border-white/10 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="text-[10px] uppercase tracking-widest text-[#e8d5b5] font-semibold flex items-center gap-1.5">
                         <DollarSign className="w-3.5 h-3.5 text-[#38bdf8]" />
-                        <span>Itemized Cost Projections ({itinerary.budgetTelemetry.currency})</span>
+                        <span>Itemized Cost Projections ({activeBudget.currency})</span>
                       </div>
                       <span className="text-xs font-mono font-semibold text-[#38bdf8]">
-                        Total: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.totalGroup.toLocaleString()}
+                        Total: {activeBudget.symbol}{activeBudget.totalTripCost.toLocaleString()}
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-xs">
-                      {itinerary.budgetTelemetry.breakdown.map((b: any, bIdx: number) => (
+                      {activeBudget.breakdown.map((b: any, bIdx: number) => (
                         <div key={bIdx} className="glass-card p-2.5 rounded-xl space-y-1">
-                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">{b.category}</div>
+                          <div className="text-[10px] text-slate-400 uppercase tracking-wider">{b.category} ({b.percentage}%)</div>
                           <div className="font-semibold text-white font-mono">
-                            {itinerary.budgetTelemetry.symbol}{b.totalGroup.toLocaleString()}
+                            {activeBudget.symbol}{b.totalGroup.toLocaleString()}
                           </div>
                           <div className="text-[9px] text-slate-400 line-clamp-1">{b.assumptions}</div>
                         </div>
                       ))}
                     </div>
                     <div className="text-[9px] text-slate-400 pt-1 border-t border-white/5 flex items-center justify-between">
-                      <span>Daily: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.dailyAveragePerPerson}/day/person</span>
-                      <span>Range: {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.rangeMinGroup.toLocaleString()} — {itinerary.budgetTelemetry.symbol}{itinerary.budgetTelemetry.rangeMaxGroup.toLocaleString()}</span>
+                      <span>Daily: {activeBudget.symbol}{activeBudget.dailyCostPerPerson.toLocaleString()} / day / person</span>
+                      <span>Range: {activeBudget.symbol}{activeBudget.totalMinGroup.toLocaleString()} — {activeBudget.symbol}{activeBudget.totalMaxGroup.toLocaleString()} (total trip)</span>
                     </div>
                   </div>
                 )}
