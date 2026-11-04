@@ -6,6 +6,8 @@ import { persist, createJSONStorage } from "zustand/middleware"
 export interface StoredActivity {
   id: string
   time: string
+  startTime?: string
+  endTime?: string
   title: string
   description: string
   duration?: string

@@ -29,6 +29,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog"
 import { ItineraryTimeline } from "@/components/trip/itinerary-timeline"
+import { calculateDurationFromTimes, calculateEndTimeFromDuration } from "@/components/trip/activity-card"
 import { TripMap, MapPoint } from "@/components/map/trip-map"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip, StoredActivity } from "@/lib/store/travel-store"
@@ -54,7 +55,8 @@ export default function TripDetailPage() {
   const [isAddActivityOpen, setIsAddActivityOpen] = React.useState(false)
   const [targetDayNumber, setTargetDayNumber] = React.useState(1)
   const [actTitle, setActTitle] = React.useState("")
-  const [actTime, setActTime] = React.useState("10:00")
+  const [actStartTime, setActStartTime] = React.useState("10:00")
+  const [actEndTime, setActEndTime] = React.useState("11:30")
   const [actDesc, setActDesc] = React.useState("")
   const [actLocation, setActLocation] = React.useState("")
   const [actDuration, setActDuration] = React.useState("1.5h")
@@ -170,8 +172,15 @@ export default function TripDetailPage() {
     e.preventDefault()
     if (!actTitle.trim()) return
 
+    const formattedTime =
+      actStartTime && actEndTime
+        ? `${actStartTime} — ${actEndTime}`
+        : actStartTime || actEndTime || "10:00"
+
     addActivityToTrip(trip.id, targetDayNumber, {
-      time: actTime,
+      time: formattedTime,
+      startTime: actStartTime || "10:00",
+      endTime: actEndTime || "11:30",
       title: actTitle,
       description: actDesc || "Curated experience.",
       location: actLocation || trip.destination,
@@ -184,6 +193,8 @@ export default function TripDetailPage() {
     setActDesc("")
     setActLocation("")
     setActCost("")
+    setActStartTime("10:00")
+    setActEndTime("11:30")
     setIsAddActivityOpen(false)
 
     toast({
@@ -443,27 +454,65 @@ export default function TripDetailPage() {
 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Time</label>
+                <label className="editorial-tag text-[9px] text-[#e8d5b5] flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5 text-[#38bdf8]" />
+                  Start Time *
+                </label>
                 <input
                   type="time"
-                  value={actTime}
-                  onChange={(e) => setActTime(e.target.value)}
-                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
+                  value={actStartTime}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setActStartTime(val)
+                    if (val) {
+                      setActEndTime(calculateEndTimeFromDuration(val, actDuration))
+                    }
+                  }}
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5 font-mono"
+                  required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Duration</label>
+                <label className="editorial-tag text-[9px] text-[#e8d5b5] flex items-center gap-1">
+                  <Clock className="w-2.5 h-2.5 text-[#34d399]" />
+                  End Time *
+                </label>
                 <input
-                  value={actDuration}
-                  onChange={(e) => setActDuration(e.target.value)}
-                  placeholder="e.g. 2h"
-                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
+                  type="time"
+                  value={actEndTime}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setActEndTime(val)
+                    if (actStartTime && val) {
+                      const derived = calculateDurationFromTimes(actStartTime, val)
+                      if (derived) setActDuration(derived)
+                    }
+                  }}
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5 font-mono"
+                  required
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Duration</label>
+                <input
+                  value={actDuration}
+                  onChange={(e) => {
+                    const val = e.target.value
+                    setActDuration(val)
+                    if (actStartTime) {
+                      const end = calculateEndTimeFromDuration(actStartTime, val)
+                      if (end) setActEndTime(end)
+                    }
+                  }}
+                  placeholder="e.g. 1.5h, 2h"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5 font-mono"
+                />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="editorial-tag text-[9px] text-[#e8d5b5]">Location</label>
                 <input
@@ -473,7 +522,9 @@ export default function TripDetailPage() {
                   className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
                 />
               </div>
+            </div>
 
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <label className="editorial-tag text-[9px] text-[#e8d5b5]">Estimated Cost ($)</label>
                 <input
@@ -481,26 +532,26 @@ export default function TripDetailPage() {
                   value={actCost}
                   onChange={(e) => setActCost(e.target.value)}
                   placeholder="0 for Free"
-                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5"
+                  className="w-full glass-input rounded-2xl text-xs h-10 px-3.5 font-mono"
                 />
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label className="editorial-tag text-[9px] text-[#e8d5b5]">Category</label>
-              <select
-                value={actCategory}
-                onChange={(e) => setActCategory(e.target.value)}
-                className="w-full h-10 px-3.5 rounded-2xl glass-input text-xs cursor-pointer"
-              >
-                <option value="Sightseeing" className="bg-[#050a10]">Sightseeing</option>
-                <option value="Dining" className="bg-[#050a10]">Dining / Food</option>
-                <option value="Culture" className="bg-[#050a10]">Culture & History</option>
-                <option value="Adventure" className="bg-[#050a10]">Adventure & Outdoor</option>
-                <option value="Stay" className="bg-[#050a10]">Accommodation / Stay</option>
-                <option value="Transit" className="bg-[#050a10]">Transportation</option>
-                <option value="Relaxation" className="bg-[#050a10]">Relaxation</option>
-              </select>
+              <div className="space-y-1.5">
+                <label className="editorial-tag text-[9px] text-[#e8d5b5]">Category</label>
+                <select
+                  value={actCategory}
+                  onChange={(e) => setActCategory(e.target.value)}
+                  className="w-full h-10 px-3.5 rounded-2xl glass-input text-xs cursor-pointer"
+                >
+                  <option value="Sightseeing" className="bg-[#050a10]">Sightseeing</option>
+                  <option value="Dining" className="bg-[#050a10]">Dining / Food</option>
+                  <option value="Culture" className="bg-[#050a10]">Culture & History</option>
+                  <option value="Adventure" className="bg-[#050a10]">Adventure & Outdoor</option>
+                  <option value="Stay" className="bg-[#050a10]">Accommodation / Stay</option>
+                  <option value="Transit" className="bg-[#050a10]">Transportation</option>
+                  <option value="Relaxation" className="bg-[#050a10]">Relaxation</option>
+                </select>
+              </div>
             </div>
 
             <div className="space-y-1.5">

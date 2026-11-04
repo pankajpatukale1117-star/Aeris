@@ -8,7 +8,9 @@ const CANDIDATE_MODELS = [
 
 const FALLBACK_SUGGESTIONS = [
   {
-    time: "10:30",
+    time: "10:30 — 11:30",
+    startTime: "10:30",
+    endTime: "11:30",
     title: "Artisan Espresso & Morning Pastry Salon",
     description: "Sip single-origin espresso paired with warm cornetti at a quiet local piazza terrace.",
     location: "Old Town Historic District",
@@ -17,7 +19,9 @@ const FALLBACK_SUGGESTIONS = [
     category: "Dining",
   },
   {
-    time: "14:00",
+    time: "14:00 — 16:00",
+    startTime: "14:00",
+    endTime: "16:00",
     title: "Panoramic Coastal Cliffside Walk & Viewpoint",
     description: "Gentle scenic stroll along the elevated pine trails with breathtaking azure water views.",
     location: "Belvedere Scenic Overlook",
@@ -26,7 +30,9 @@ const FALLBACK_SUGGESTIONS = [
     category: "Sightseeing",
   },
   {
-    time: "17:30",
+    time: "17:30 — 19:00",
+    startTime: "17:30",
+    endTime: "19:00",
     title: "Sunset Aperitivo at Terrace Lounge",
     description: "Chilled regional spritz with artisan olives and local cheeses as golden hour illuminates the sea.",
     location: "Cliffside Lounge",
@@ -35,7 +41,9 @@ const FALLBACK_SUGGESTIONS = [
     category: "Culture & Nightlife",
   },
   {
-    time: "20:00",
+    time: "20:00 — 22:30",
+    startTime: "20:00",
+    endTime: "22:30",
     title: "Intimate Trattoria Candlelit Dinner",
     description: "Hand-rolled pasta, freshly caught seafood, and local wine in a tucked-away stone courtyard.",
     location: "Piazza del Duomo",

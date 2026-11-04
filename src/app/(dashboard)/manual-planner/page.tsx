@@ -30,7 +30,12 @@ import {
   CalendarDays,
   Calculator,
 } from "lucide-react"
-import { ActivityCard, ActivityItem } from "@/components/trip/activity-card"
+import {
+  ActivityCard,
+  ActivityItem,
+  calculateDurationFromTimes,
+  calculateEndTimeFromDuration,
+} from "@/components/trip/activity-card"
 import { TripCalculator } from "@/components/trip/trip-calculator"
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
@@ -69,7 +74,9 @@ const DEFAULT_DAYS: ManualDay[] = [
     activities: [
       {
         id: "m-1",
-        time: "14:00",
+        time: "14:00 — 15:00",
+        startTime: "14:00",
+        endTime: "15:00",
         title: "Check into Cliffside Villa",
         description: "Unpack and take in the panoramic views of the Tyrrhenian Sea.",
         location: "Positano",
@@ -79,7 +86,9 @@ const DEFAULT_DAYS: ManualDay[] = [
       },
       {
         id: "m-2",
-        time: "18:00",
+        time: "18:00 — 19:30",
+        startTime: "18:00",
+        endTime: "19:30",
         title: "Sunset Aperitivo at Franco's Bar",
         description: "Enjoy chilled Prosecco and local olives overlooking the colorful hillside.",
         location: "Positano Village",
@@ -95,7 +104,9 @@ const DEFAULT_DAYS: ManualDay[] = [
     activities: [
       {
         id: "m-3",
-        time: "08:30",
+        time: "08:30 — 12:00",
+        startTime: "08:30",
+        endTime: "12:00",
         title: "Sentiero degli Dei Trek",
         description: "Breathtaking coastal hiking trail high above the sea between Bomerano and Nocelle.",
         location: "Bomerano",
@@ -273,7 +284,8 @@ function ManualPlannerContent() {
 
   // New Activity Form State (Requirement 4)
   const [isAddingActivity, setIsAddingActivity] = React.useState(false)
-  const [newActTime, setNewActTime] = React.useState("10:00")
+  const [newActStartTime, setNewActStartTime] = React.useState("10:00")
+  const [newActEndTime, setNewActEndTime] = React.useState("11:30")
   const [newActTitle, setNewActTitle] = React.useState("")
   const [newActDesc, setNewActDesc] = React.useState("")
   const [newActLoc, setNewActLoc] = React.useState("")
@@ -283,7 +295,8 @@ function ManualPlannerContent() {
 
   // Inline Edit Form State (Requirement 5)
   const [editingActId, setEditingActId] = React.useState<string | null>(null)
-  const [editTime, setEditTime] = React.useState("10:00")
+  const [editStartTime, setEditStartTime] = React.useState("10:00")
+  const [editEndTime, setEditEndTime] = React.useState("11:30")
   const [editTitle, setEditTitle] = React.useState("")
   const [editDesc, setEditDesc] = React.useState("")
   const [editLoc, setEditLoc] = React.useState("")
@@ -399,9 +412,16 @@ function ManualPlannerContent() {
     if (!newActTitle.trim()) return
 
     const cleanCost = newActCost ? newActCost.replace(/[^0-9.]/g, "") : ""
+    const formattedTime =
+      newActStartTime && newActEndTime
+        ? `${newActStartTime} — ${newActEndTime}`
+        : newActStartTime || newActEndTime || "10:00"
+
     const newActivity: ActivityItem = {
       id: `act-${Date.now()}`,
-      time: newActTime,
+      time: formattedTime,
+      startTime: newActStartTime || "10:00",
+      endTime: newActEndTime || "11:30",
       title: newActTitle.trim(),
       description: newActDesc.trim(),
       location: newActLoc.trim(),
@@ -421,6 +441,8 @@ function ManualPlannerContent() {
     setNewActLoc("")
     setNewActCost("")
     setNewActDuration("1.5h")
+    setNewActStartTime("10:00")
+    setNewActEndTime("11:30")
     setIsAddingActivity(false)
 
     toast({
@@ -431,7 +453,30 @@ function ManualPlannerContent() {
 
   const handleStartEdit = (act: ActivityItem) => {
     setEditingActId(act.id)
-    setEditTime(act.time || "10:00")
+
+    // Resolve start and end times
+    let sTime = act.startTime || ""
+    let eTime = act.endTime || ""
+    if (!sTime && act.time) {
+      if (act.time.includes("—")) {
+        const [s, e] = act.time.split("—").map((p) => p.trim())
+        sTime = s || "10:00"
+        eTime = e || ""
+      } else if (act.time.includes("-")) {
+        const [s, e] = act.time.split("-").map((p) => p.trim())
+        sTime = s || "10:00"
+        eTime = e || ""
+      } else {
+        sTime = act.time
+      }
+    }
+    if (!sTime) sTime = "10:00"
+    if (!eTime) {
+      eTime = calculateEndTimeFromDuration(sTime, act.duration || "1.5h")
+    }
+
+    setEditStartTime(sTime)
+    setEditEndTime(eTime)
     setEditTitle(act.title || "")
     setEditDesc(act.description || "")
     setEditLoc(act.location || "")
@@ -446,6 +491,11 @@ function ManualPlannerContent() {
     if (!editTitle.trim() || !editingActId) return
 
     const cleanCost = editCost.trim() ? editCost.trim().replace(/[^0-9.]/g, "") : ""
+    const formattedTime =
+      editStartTime && editEndTime
+        ? `${editStartTime} — ${editEndTime}`
+        : editStartTime || editEndTime || "10:00"
+
     setDays((prev) =>
       prev.map((d) =>
         d.dayNumber === activeDayNumber
@@ -455,7 +505,9 @@ function ManualPlannerContent() {
                 a.id === editingActId
                   ? {
                       ...a,
-                      time: editTime,
+                      time: formattedTime,
+                      startTime: editStartTime || "10:00",
+                      endTime: editEndTime || "11:30",
                       title: editTitle.trim(),
                       description: editDesc.trim(),
                       location: editLoc.trim(),
@@ -528,13 +580,20 @@ function ManualPlannerContent() {
 
       const data = await res.json()
       if (data.activity) {
+        const sTime = data.activity.startTime || data.activity.time || "15:00"
+        const dur = data.activity.duration || "1.5h"
+        const eTime = data.activity.endTime || calculateEndTimeFromDuration(sTime, dur)
+        const formattedTime = sTime && eTime ? `${sTime} — ${eTime}` : sTime
+
         const suggested: ActivityItem = {
           id: `act-${Date.now()}`,
-          time: data.activity.time || "15:00",
+          time: formattedTime,
+          startTime: sTime,
+          endTime: eTime,
           title: data.activity.title,
           description: data.activity.description,
           location: data.activity.location,
-          duration: data.activity.duration || "1.5h",
+          duration: dur,
           estimatedCost: data.activity.estimatedCost
             ? String(data.activity.estimatedCost).replace(/[^0-9.]/g, "")
             : "Free",
@@ -585,7 +644,11 @@ function ManualPlannerContent() {
       } else {
         d.activities.forEach((a) => {
           const costStr = a.estimatedCost ? formatCurrency(a.estimatedCost, currency) : "Free"
-          text += `  • ${a.time} — ${a.title} [${a.category || "Sightseeing"}] (${a.duration || "1.5h"})\n`
+          const timeDisplay =
+            a.startTime && a.endTime
+              ? `${a.startTime} — ${a.endTime}`
+              : a.startTime || a.time || "Scheduled"
+          text += `  • ${timeDisplay} — ${a.title} [${a.category || "Sightseeing"}] (${a.duration || "1.5h"})\n`
           if (a.location) text += `    Location: ${a.location}\n`
           text += `    Cost: ${costStr}\n`
           if (a.description) text += `    Details: ${a.description}\n`
@@ -634,6 +697,8 @@ function ManualPlannerContent() {
         activities: d.activities.map((a) => ({
           id: a.id,
           time: a.time,
+          startTime: a.startTime,
+          endTime: a.endTime,
           title: a.title,
           description: a.description,
           location: a.location,
@@ -1153,16 +1218,48 @@ function ManualPlannerContent() {
                   </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                   <div className="space-y-1">
-                    <label className="editorial-tag text-[8px] text-[#94a3b8]">Time</label>
+                    <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-[#38bdf8]" />
+                      Start Time *
+                    </label>
                     <input
                       type="time"
-                      value={newActTime}
-                      onChange={(e) => setNewActTime(e.target.value)}
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                      value={newActStartTime}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setNewActStartTime(val)
+                        if (val) {
+                          setNewActEndTime(calculateEndTimeFromDuration(val, newActDuration))
+                        }
+                      }}
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                      required
                     />
                   </div>
+
+                  <div className="space-y-1">
+                    <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5 text-[#34d399]" />
+                      End Time *
+                    </label>
+                    <input
+                      type="time"
+                      value={newActEndTime}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setNewActEndTime(val)
+                        if (newActStartTime && val) {
+                          const derived = calculateDurationFromTimes(newActStartTime, val)
+                          if (derived) setNewActDuration(derived)
+                        }
+                      }}
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                      required
+                    />
+                  </div>
+
                   <div className="space-y-1 sm:col-span-2">
                     <label className="editorial-tag text-[8px] text-[#94a3b8]">Title *</label>
                     <input
@@ -1207,9 +1304,16 @@ function ManualPlannerContent() {
                     <label className="editorial-tag text-[8px] text-[#94a3b8]">Duration</label>
                     <input
                       value={newActDuration}
-                      onChange={(e) => setNewActDuration(e.target.value)}
+                      onChange={(e) => {
+                        const val = e.target.value
+                        setNewActDuration(val)
+                        if (newActStartTime) {
+                          const end = calculateEndTimeFromDuration(newActStartTime, val)
+                          if (end) setNewActEndTime(end)
+                        }
+                      }}
                       placeholder="e.g. 1.5h, 2h, Half Day"
-                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                      className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
                     />
                   </div>
                 </div>
@@ -1247,7 +1351,13 @@ function ManualPlannerContent() {
                         <button
                           key={preset}
                           type="button"
-                          onClick={() => setNewActDuration(preset)}
+                          onClick={() => {
+                            setNewActDuration(preset)
+                            if (newActStartTime) {
+                              const end = calculateEndTimeFromDuration(newActStartTime, preset)
+                              if (end) setNewActEndTime(end)
+                            }
+                          }}
                           className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
                             newActDuration === preset
                               ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white"
@@ -1314,16 +1424,48 @@ function ManualPlannerContent() {
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
                         <div className="space-y-1">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">Time</label>
+                          <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 text-[#38bdf8]" />
+                            Start Time *
+                          </label>
                           <input
                             type="time"
-                            value={editTime}
-                            onChange={(e) => setEditTime(e.target.value)}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                            value={editStartTime}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setEditStartTime(val)
+                              if (val) {
+                                setEditEndTime(calculateEndTimeFromDuration(val, editDuration))
+                              }
+                            }}
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                            required
                           />
                         </div>
+
+                        <div className="space-y-1">
+                          <label className="editorial-tag text-[8px] text-[#94a3b8] flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5 text-[#34d399]" />
+                            End Time *
+                          </label>
+                          <input
+                            type="time"
+                            value={editEndTime}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setEditEndTime(val)
+                              if (editStartTime && val) {
+                                const derived = calculateDurationFromTimes(editStartTime, val)
+                                if (derived) setEditDuration(derived)
+                              }
+                            }}
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                            required
+                          />
+                        </div>
+
                         <div className="space-y-1 sm:col-span-2">
                           <label className="editorial-tag text-[8px] text-[#94a3b8]">Title *</label>
                           <input
@@ -1362,34 +1504,71 @@ function ManualPlannerContent() {
                           <label className="editorial-tag text-[8px] text-[#94a3b8]">Duration</label>
                           <input
                             value={editDuration}
-                            onChange={(e) => setEditDuration(e.target.value)}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setEditDuration(val)
+                              if (editStartTime) {
+                                const end = calculateEndTimeFromDuration(editStartTime, val)
+                                if (end) setEditEndTime(end)
+                              }
+                            }}
+                            placeholder="e.g. 1.5h, 2h, Half Day"
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
                           />
                         </div>
                       </div>
 
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between">
-                          <label className="editorial-tag text-[8px] text-[#94a3b8]">
-                            Est. Cost ({currentCurrency.symbol})
-                          </label>
-                          <button
-                            type="button"
-                            onClick={handleOpenCalcForEditActivity}
-                            className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
-                            title="Calculate cost with numpad"
-                          >
-                            <Calculator className="w-2.5 h-2.5" />
-                            <span>Calc</span>
-                          </button>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="editorial-tag text-[8px] text-[#94a3b8]">
+                              Est. Cost ({currentCurrency.symbol})
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleOpenCalcForEditActivity}
+                              className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                              title="Calculate cost with numpad"
+                            >
+                              <Calculator className="w-2.5 h-2.5" />
+                              <span>Calc</span>
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            value={editCost}
+                            onChange={(e) => setEditCost(e.target.value)}
+                            placeholder="0 for Free"
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                          />
                         </div>
-                        <input
-                          type="number"
-                          value={editCost}
-                          onChange={(e) => setEditCost(e.target.value)}
-                          placeholder="0 for Free"
-                          className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                        />
+                        <div className="space-y-1">
+                          <label className="editorial-tag text-[8px] text-[#94a3b8]">
+                            Duration Quick Presets
+                          </label>
+                          <div className="flex flex-wrap gap-1.5 pt-0.5">
+                            {DURATION_PRESETS.map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => {
+                                  setEditDuration(preset)
+                                  if (editStartTime) {
+                                    const end = calculateEndTimeFromDuration(editStartTime, preset)
+                                    if (end) setEditEndTime(end)
+                                  }
+                                }}
+                                className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                  editDuration === preset
+                                    ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white"
+                                    : "glass-pill text-slate-400 hover:text-white"
+                                }`}
+                              >
+                                {preset}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
                       </div>
 
                       <div className="space-y-1">
