@@ -278,6 +278,23 @@ export function calculateTripBudget(params: BudgetInputParams): DetailedTripBudg
 }
 
 /**
+ * Clean universal currency formatter.
+ * Strips any leading currency symbol and formats strictly from numeric value.
+ */
+export function formatCurrency(
+  amount: number | string,
+  currency: CurrencyCode = "USD"
+): string {
+  if (typeof amount === "string" && amount.trim().toLowerCase() === "free") {
+    return "Free"
+  }
+  const rawNum = typeof amount === "number" ? amount : Number(String(amount).replace(/[^0-9.-]/g, ""))
+  const num = isNaN(rawNum) ? 0 : rawNum
+  const symbol = CURRENCY_SYMBOLS[currency] || "$"
+  return `${symbol}${Math.round(num).toLocaleString()}`
+}
+
+/**
  * Seamless Currency Recalculator
  * Takes an existing DetailedTripBudget and converts it to a new target currency
  * using the preserved baseDailyUsd rate, ensuring zero compounding drift.
