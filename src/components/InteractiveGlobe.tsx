@@ -71,6 +71,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
     if (mode === 'dark') {
       return {
         version: 8,
+        projection: { type: 'globe' },
         sources: {
           'esri-dark-base': {
             type: 'raster',
@@ -108,6 +109,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
     }
     return {
       version: 8,
+      projection: { type: 'globe' },
       sources: {
         'esri-satellite': {
           type: 'raster',
@@ -241,10 +243,10 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
       container: mapContainerRef.current,
       style: getMapStyle(mapMode),
       center: [74.2433, 16.7050],
-      zoom: 2.3,
-      pitch: 25,
-      bearing: 0,
-      maxPitch: 75
+      zoom: 1.8,
+      pitch: 35,
+      bearing: -8,
+      maxPitch: 80
     });
 
     mapRef.current = map;
@@ -257,6 +259,39 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
         }
       } catch {}
     };
+
+    // Auto-rotation engine matching Google Earth & Apple Maps
+    let isUserInteracting = false;
+    let spinTimer: any = null;
+
+    const spin = () => {
+      if (!isUserInteracting && mapRef.current) {
+        const zoom = mapRef.current.getZoom();
+        if (zoom < 4.5) {
+          const center = mapRef.current.getCenter();
+          center.lng -= 0.15;
+          mapRef.current.easeTo({ center, duration: 1000, easing: (n) => n });
+        }
+      }
+    };
+
+    spinTimer = setInterval(spin, 1000);
+
+    const pauseInteraction = () => {
+      isUserInteracting = true;
+    };
+    const resumeInteraction = () => {
+      setTimeout(() => {
+        isUserInteracting = false;
+      }, 4000);
+    };
+
+    map.on('mousedown', pauseInteraction);
+    map.on('touchstart', pauseInteraction);
+    map.on('wheel', pauseInteraction);
+    map.on('mouseup', resumeInteraction);
+    map.on('touchend', resumeInteraction);
+    map.on('dragend', resumeInteraction);
 
     map.on('style.load', enableGlobeProjection);
     map.on('load', () => {
@@ -287,6 +322,7 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
     });
 
     return () => {
+      if (spinTimer) clearInterval(spinTimer);
       map.remove();
       mapRef.current = null;
     };
@@ -380,6 +416,26 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
             📍 Locate Me
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              if (mapRef.current) {
+                mapRef.current.flyTo({
+                  center: [74.2433, 16.7050],
+                  zoom: 1.8,
+                  pitch: 35,
+                  bearing: -8,
+                  duration: 2500,
+                  essential: true
+                });
+              }
+            }}
+            className="glass-pill px-3 py-2 rounded-xl text-xs text-[#e8d5b5] hover:text-white"
+            title="View Whole Earth from Orbit"
+          >
+            🌍 Orbit
+          </button>
+
           <div className="flex rounded-xl overflow-hidden border border-white/15">
             <button
               type="button"
@@ -414,9 +470,37 @@ export function InteractiveGlobe({ onSelectDestination, onSelectLocation }: Inte
         ))}
       </div>
 
-      {/* Main 3D Globe Viewport + Floating Clicked Location Dossier */}
-      <div className="relative w-full" style={{ height: '620px', width: '100%' }}>
-        <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
+      {/* Main 3D Globe Viewport with Deep Space & Atmospheric Halo + Floating Dossier */}
+      <div
+        className="relative w-full overflow-hidden"
+        style={{
+          height: '620px',
+          width: '100%',
+          backgroundColor: '#02060d',
+          backgroundImage: `
+            radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.08) 0%, rgba(2, 6, 13, 0.85) 60%, #010408 100%),
+            radial-gradient(1.5px 1.5px at 12% 18%, rgba(255, 255, 255, 0.8) 100%, transparent),
+            radial-gradient(1px 1px at 28% 75%, rgba(255, 255, 255, 0.6) 100%, transparent),
+            radial-gradient(1.5px 1.5px at 78% 22%, rgba(255, 255, 255, 0.85) 100%, transparent),
+            radial-gradient(1px 1px at 88% 68%, rgba(255, 255, 255, 0.5) 100%, transparent),
+            radial-gradient(1.2px 1.2px at 48% 88%, rgba(255, 255, 255, 0.7) 100%, transparent)
+          `
+        }}
+      >
+        {/* Luminous Atmospheric Halo Ring behind the Earth sphere */}
+        <div
+          className="absolute inset-0 pointer-events-none flex items-center justify-center"
+          aria-hidden="true"
+        >
+          <div
+            className="w-[520px] h-[520px] rounded-full opacity-45 blur-3xl"
+            style={{
+              background: 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, rgba(232, 213, 181, 0.15) 45%, transparent 70%)'
+            }}
+          />
+        </div>
+
+        <div ref={mapContainerRef} style={{ width: '100%', height: '100%', position: 'relative', zIndex: 10 }} />
 
         {/* Floating Right Glass Info Dossier Card (Updates Wherever You Click) */}
         {selectedSpot && (
