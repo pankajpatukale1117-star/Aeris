@@ -15,6 +15,7 @@ export interface StoredActivity {
   estimatedCost?: string
   category?: string
   isBooked?: boolean
+  bookingStatus?: "wishlist" | "reserved" | "booked"
   lat?: number
   lng?: number
 }

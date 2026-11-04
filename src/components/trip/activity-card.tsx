@@ -12,10 +12,13 @@ export interface ActivityItem {
   description: string
   duration?: string
   location?: string
+  lat?: number
+  lng?: number
   estimatedCost?: string | number
   cost?: number
   category?: string
   isBooked?: boolean
+  bookingStatus?: "wishlist" | "reserved" | "booked"
 }
 
 // Calculate duration string (e.g. "1.5h", "2h", "45m") from start and end times

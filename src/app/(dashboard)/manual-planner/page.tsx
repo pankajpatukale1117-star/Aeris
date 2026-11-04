@@ -31,18 +31,53 @@ import {
   Calculator,
   ChevronDown,
   ChevronUp,
+  Bookmark,
+  Navigation,
 } from "lucide-react"
+
+// Drag and Drop (dnd-kit)
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core"
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+
+// Components & Types
 import {
   ActivityCard,
   ActivityItem,
   calculateDurationFromTimes,
   calculateEndTimeFromDuration,
 } from "@/components/trip/activity-card"
+import { QuickAddBar } from "@/components/planner/quick-add-bar"
+import { SortableActivityCard } from "@/components/planner/sortable-activity-card"
+import { ScratchpadTray, StagedItem } from "@/components/planner/scratchpad-tray"
+import { PlannerMapPanel } from "@/components/planner/planner-map-panel"
 import { TripCalculator } from "@/components/trip/trip-calculator"
+
+// Utilities & Hooks
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
 import { DESTINATIONS } from "@/lib/constants"
 import { formatCurrency, CurrencyCode } from "@/lib/budget/budget-calculator"
+import { ParsedActivity } from "@/lib/planner/quick-add-parser"
+import { DayTemplate, QuickStamp } from "@/lib/planner/day-templates"
+import { exportToICalendar } from "@/lib/planner/calendar-exporter"
+import {
+  estimateTransit,
+  resolveCoordinates,
+  TransitEstimate,
+} from "@/lib/planner/route-optimizer"
 
 interface ManualDay {
   dayNumber: number
@@ -67,7 +102,7 @@ const CATEGORY_OPTIONS = [
   "Relaxation",
 ]
 
-const DURATION_PRESETS = ["1h", "1.5h", "2h", "3h", "Half Day", "Full Day"]
+const DURATION_PRESETS = ["30m", "45m", "1h", "1.5h", "2h", "3h", "Half Day", "Full Day"]
 
 const DEFAULT_DAYS: ManualDay[] = [
   {
@@ -80,11 +115,12 @@ const DEFAULT_DAYS: ManualDay[] = [
         startTime: "14:00",
         endTime: "15:00",
         title: "Check into Cliffside Villa",
-        description: "Unpack and take in the panoramic views of the Tyrrhenian Sea.",
+        description: "Unpack and take in panoramic views of the Tyrrhenian Sea.",
         location: "Positano",
         duration: "1h",
         estimatedCost: "350",
         category: "Stay",
+        bookingStatus: "reserved",
       },
       {
         id: "m-2",
@@ -92,11 +128,12 @@ const DEFAULT_DAYS: ManualDay[] = [
         startTime: "18:00",
         endTime: "19:30",
         title: "Sunset Aperitivo at Franco's Bar",
-        description: "Enjoy chilled Prosecco and local olives overlooking the colorful hillside.",
+        description: "Chilled Prosecco and local olives overlooking the hillside.",
         location: "Positano Village",
         duration: "1.5h",
         estimatedCost: "40",
         category: "Dining",
+        bookingStatus: "wishlist",
       },
     ],
   },
@@ -115,12 +152,56 @@ const DEFAULT_DAYS: ManualDay[] = [
         duration: "3.5h",
         estimatedCost: "Free",
         category: "Adventure",
+        bookingStatus: "wishlist",
       },
     ],
   },
 ]
 
+const DEFAULT_STAGED_ITEMS: StagedItem[] = [
+  {
+    id: "staged-1",
+    title: "Gelato tasting at Buca di Bacco",
+    location: "Spiaggia Grande",
+    estimatedCost: "15",
+    category: "Dining",
+    notes: "Try pistachio and lemon gelato",
+  },
+  {
+    id: "staged-2",
+    title: "Private sunset boat to Faraglioni rocks",
+    location: "Marina Grande, Capri",
+    estimatedCost: "220",
+    category: "Adventure",
+    notes: "Requires advance booking before 4 PM",
+  },
+]
+
 const STORAGE_KEY = "roveo_manual_draft_v1"
+const SCRATCHPAD_KEY = "roveo_manual_scratchpad_v1"
+
+const DESTINATION_COORDS: Record<string, [number, number]> = {
+  "santorini-greece": [36.3932, 25.4615],
+  "kyoto-japan": [35.0116, 135.7681],
+  "bali-indonesia": [-8.4095, 115.1889],
+  "paris-france": [48.8566, 2.3522],
+  "machu-picchu-peru": [-13.1631, -72.545],
+  maldives: [3.2028, 73.2207],
+  "iceland-aurora": [64.1466, -21.9426],
+  "safari-kenya": [-1.2921, 36.8219],
+  "amalfi-coast-italy": [40.634, 14.6027],
+  "new-york-city-usa": [40.7128, -74.006],
+  "bangkok-thailand": [13.7563, 100.5018],
+  "new-zealand-south-island": [-45.0312, 168.6626],
+  "patagonia-argentina": [-50.0, -73.0],
+  "dubai-uae": [25.2048, 55.2708],
+  "prague-czech-republic": [50.0755, 14.4378],
+  "marrakech-morocco": [31.6295, -7.9811],
+  "costa-rica": [9.7489, -83.7534],
+  "swiss-alps": [46.5606, 7.9147],
+  "rio-de-janeiro-brazil": [-22.9068, -43.1729],
+  singapore: [1.3521, 103.8198],
+}
 
 // Safe date helpers using UTC
 function formatDisplayDate(dateStr: string, offsetDays: number = 0): string {
@@ -167,18 +248,23 @@ function ManualPlannerContent() {
   const [days, setDays] = React.useState<ManualDay[]>(DEFAULT_DAYS)
   const [activeDayNumber, setActiveDayNumber] = React.useState(1)
 
-  // Mobile Viewport Ergonomics (<1024px)
-  const [mobileTab, setMobileTab] = React.useState<"trip" | "day" | "budget">("day")
+  // Unassigned Bucket List / Scratchpad Tray State
+  const [isScratchpadOpen, setIsScratchpadOpen] = React.useState(false)
+  const [stagedItems, setStagedItems] = React.useState<StagedItem[]>(DEFAULT_STAGED_ITEMS)
 
-  // Auto-Save Draft to localStorage (Requirement 8)
+  // Interactive Map Split Panel State
+  const [isMapOpen, setIsMapOpen] = React.useState(false)
+
+  // Auto-Save Draft to localStorage
   const [isLoadedFromStorage, setIsLoadedFromStorage] = React.useState(false)
   const [hasAutoSaved, setHasAutoSaved] = React.useState(false)
 
+  // Load from localStorage on mount
   React.useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved) {
-        const parsed = JSON.parse(saved)
+      const savedDraft = localStorage.getItem(STORAGE_KEY)
+      if (savedDraft) {
+        const parsed = JSON.parse(savedDraft)
         if (parsed.tripTitle) setTripTitle(parsed.tripTitle)
         if (parsed.destination) setDestination(parsed.destination)
         if (parsed.startDate) setStartDate(parsed.startDate)
@@ -189,6 +275,14 @@ function ManualPlannerContent() {
           setDays(parsed.days)
         }
       }
+
+      const savedStaged = localStorage.getItem(SCRATCHPAD_KEY)
+      if (savedStaged) {
+        const parsedStaged = JSON.parse(savedStaged)
+        if (Array.isArray(parsedStaged)) {
+          setStagedItems(parsedStaged)
+        }
+      }
     } catch (e) {
       // Ignore corrupted localStorage
     } finally {
@@ -196,6 +290,7 @@ function ManualPlannerContent() {
     }
   }, [])
 
+  // Auto-save draft changes
   React.useEffect(() => {
     if (!isLoadedFromStorage) return
     const timeout = setTimeout(() => {
@@ -211,17 +306,19 @@ function ManualPlannerContent() {
           updatedAt: Date.now(),
         }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(draft))
+        localStorage.setItem(SCRATCHPAD_KEY, JSON.stringify(stagedItems))
         setHasAutoSaved(true)
       } catch (e) {
         // Storage write error
       }
     }, 500)
     return () => clearTimeout(timeout)
-  }, [tripTitle, destination, startDate, budget, currency, notes, days, isLoadedFromStorage])
+  }, [tripTitle, destination, startDate, budget, currency, notes, days, stagedItems, isLoadedFromStorage])
 
   const handleResetTemplate = () => {
     try {
       localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(SCRATCHPAD_KEY)
     } catch {}
     setTripTitle("Custom Mediterranean Getaway")
     setDestination(prefillDestination || "Amalfi Coast, Italy")
@@ -230,6 +327,7 @@ function ManualPlannerContent() {
     setCurrency("USD")
     setNotes("Remember to book ferry between Positano and Capri.")
     setDays(DEFAULT_DAYS)
+    setStagedItems(DEFAULT_STAGED_ITEMS)
     setActiveDayNumber(1)
     toast({
       title: "Template Reset",
@@ -240,12 +338,32 @@ function ManualPlannerContent() {
   // Active Currency Config
   const currentCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]
 
-  // Calculated End Date (Requirement 7)
+  // Calculated End Date
   const computedEndDate = React.useMemo(() => {
     return calculateEndDate(startDate, days.length)
   }, [startDate, days.length])
 
-  // Running Total Budget Calculations (Requirement 2)
+  // Destination Center Coordinates for Map & Routing
+  const destinationCenter: [number, number] = React.useMemo(() => {
+    const matched = DESTINATIONS.find(
+      (d) =>
+        d.name.toLowerCase() === destination.toLowerCase() ||
+        destination.toLowerCase().includes(d.name.toLowerCase()) ||
+        d.id.toLowerCase() === destination.toLowerCase()
+    )
+    if (matched && DESTINATION_COORDS[matched.id]) {
+      return DESTINATION_COORDS[matched.id]
+    }
+    const destClean = destination.toLowerCase().replace(/[^a-z]/g, "")
+    const key = Object.keys(DESTINATION_COORDS).find((k) =>
+      destClean.includes(k.split("-")[0])
+    )
+    if (key) return DESTINATION_COORDS[key]
+
+    return [40.634, 14.6027] // Default Amalfi Coast
+  }, [destination])
+
+  // Running Total Budget Calculations
   const totalPlannedCost = React.useMemo(() => {
     return days.reduce((sum, d) => {
       return (
@@ -284,7 +402,39 @@ function ManualPlannerContent() {
     return breakdown
   }, [days])
 
-  // New Activity Form State (Requirement 4)
+  // Active Day Resolution
+  const activeDay = days.find((d) => d.dayNumber === activeDayNumber) || days[0] || {
+    dayNumber: 1,
+    title: "Day 1",
+    activities: [],
+  }
+
+  const allDayNumbers = React.useMemo(() => days.map((d) => d.dayNumber), [days])
+
+  // Smart Start Time calculation for next activity (chaining from previous end time)
+  const defaultStartTime = React.useMemo(() => {
+    if (activeDay.activities.length === 0) return "09:00"
+    const last = activeDay.activities[activeDay.activities.length - 1]
+    return last.endTime || "14:00"
+  }, [activeDay.activities])
+
+  // Consecutive Transit Estimates on Active Day
+  const transitEstimates = React.useMemo(() => {
+    const estimates: Array<TransitEstimate | null> = []
+    const acts = activeDay.activities
+    for (let i = 0; i < acts.length; i++) {
+      if (i < acts.length - 1) {
+        const p1 = resolveCoordinates(acts[i], destinationCenter, i)
+        const p2 = resolveCoordinates(acts[i + 1], destinationCenter, i + 1)
+        estimates.push(estimateTransit(p1, p2))
+      } else {
+        estimates.push(null)
+      }
+    }
+    return estimates
+  }, [activeDay.activities, destinationCenter])
+
+  // New Activity Form State (Manual modal / detailed view)
   const [isAddingActivity, setIsAddingActivity] = React.useState(false)
   const [newActStartTime, setNewActStartTime] = React.useState("10:00")
   const [newActEndTime, setNewActEndTime] = React.useState("11:30")
@@ -295,7 +445,7 @@ function ManualPlannerContent() {
   const [newActCat, setNewActCat] = React.useState("Sightseeing")
   const [newActDuration, setNewActDuration] = React.useState("1.5h")
 
-  // Inline Edit Form State (Requirement 5)
+  // Inline Edit Form State
   const [editingActId, setEditingActId] = React.useState<string | null>(null)
   const [editStartTime, setEditStartTime] = React.useState("10:00")
   const [editEndTime, setEditEndTime] = React.useState("11:30")
@@ -306,7 +456,7 @@ function ManualPlannerContent() {
   const [editCat, setEditCat] = React.useState("Sightseeing")
   const [editDuration, setEditDuration] = React.useState("1.5h")
 
-  // AI Suggest Activity State (Requirement 9)
+  // AI Suggest Activity State
   const [isSuggesting, setIsSuggesting] = React.useState(false)
 
   // Simplified UI Toggles
@@ -318,6 +468,37 @@ function ManualPlannerContent() {
   // Interactive Trip Financial Calculator State
   const [isCalcOpen, setIsCalcOpen] = React.useState(false)
   const [calcTargetMode, setCalcTargetMode] = React.useState<"activity_new" | "activity_edit" | "budget">("activity_new")
+
+  // dnd-kit Sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 5,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    setDays((prev) =>
+      prev.map((d) => {
+        if (d.dayNumber !== activeDayNumber) return d
+        const oldIndex = d.activities.findIndex((a) => a.id === active.id)
+        const newIndex = d.activities.findIndex((a) => a.id === over.id)
+        if (oldIndex === -1 || newIndex === -1) return d
+
+        return {
+          ...d,
+          activities: arrayMove(d.activities, oldIndex, newIndex),
+        }
+      })
+    )
+  }
 
   const handleOpenCalcForNewActivity = () => {
     setCalcTargetMode("activity_new")
@@ -348,14 +529,7 @@ function ManualPlannerContent() {
     setBudget(String(amount))
   }
 
-  // Active Day Resolution
-  const activeDay = days.find((d) => d.dayNumber === activeDayNumber) || days[0] || {
-    dayNumber: 1,
-    title: "Day 1",
-    activities: [],
-  }
-
-  // Day Management Handlers (Requirement 6)
+  // Day Management Handlers
   const handleAddDay = () => {
     const nextDayNum = days.length + 1
     const nextDayDate = formatDisplayDate(startDate, nextDayNum - 1)
@@ -393,12 +567,8 @@ function ManualPlannerContent() {
     })
 
     setActiveDayNumber((prev) => {
-      if (prev === dayNum) {
-        return Math.max(1, dayNum - 1)
-      }
-      if (prev > dayNum) {
-        return prev - 1
-      }
+      if (prev === dayNum) return Math.max(1, dayNum - 1)
+      if (prev > dayNum) return prev - 1
       return prev
     })
 
@@ -414,7 +584,220 @@ function ManualPlannerContent() {
     )
   }
 
-  // Activity Handlers (Requirements 1, 4, 5)
+  // Quick-Add Natural Language Handler
+  const handleQuickAddActivity = (parsed: ParsedActivity) => {
+    const cleanCost = parsed.estimatedCost ? parsed.estimatedCost.replace(/[^0-9.]/g, "") : ""
+    const newAct: ActivityItem = {
+      id: `act-${Date.now()}`,
+      time: `${parsed.startTime} — ${parsed.endTime}`,
+      startTime: parsed.startTime,
+      endTime: parsed.endTime,
+      title: parsed.title,
+      description: parsed.description || "",
+      location: parsed.location || "",
+      duration: parsed.duration || "1.5h",
+      estimatedCost: cleanCost ? cleanCost : "Free",
+      category: parsed.category,
+      bookingStatus: "wishlist",
+    }
+
+    setDays((prev) =>
+      prev.map((d) =>
+        d.dayNumber === activeDayNumber ? { ...d, activities: [...d.activities, newAct] } : d
+      )
+    )
+
+    toast({
+      title: "⚡ Quick Added",
+      description: `"${newAct.title}" added to Day ${activeDayNumber}.`,
+    })
+  }
+
+  // Apply Day Template Handler
+  const handleApplyDayTemplate = (template: DayTemplate) => {
+    const newActivities: ActivityItem[] = template.activities.map((tAct, idx) => ({
+      id: `act-${Date.now()}-${idx}`,
+      time: `${tAct.startTime} — ${tAct.endTime}`,
+      startTime: tAct.startTime,
+      endTime: tAct.endTime,
+      title: tAct.title,
+      description: tAct.description || "",
+      location: tAct.location || destination,
+      duration: tAct.duration,
+      estimatedCost: tAct.estimatedCost,
+      category: tAct.category,
+      bookingStatus: "wishlist",
+    }))
+
+    setDays((prev) =>
+      prev.map((d) =>
+        d.dayNumber === activeDayNumber
+          ? {
+              ...d,
+              title: template.name,
+              activities: [...d.activities, ...newActivities],
+            }
+          : d
+      )
+    )
+
+    toast({
+      title: `Template Applied: ${template.name}`,
+      description: `Added ${template.activities.length} curated stops to Day ${activeDayNumber}.`,
+    })
+  }
+
+  // Apply Quick Stamp Handler
+  const handleApplyQuickStamp = (stamp: QuickStamp) => {
+    const sTime = defaultStartTime
+    const eTime = calculateEndTimeFromDuration(sTime, stamp.duration)
+    const newAct: ActivityItem = {
+      id: `act-${Date.now()}`,
+      time: `${sTime} — ${eTime}`,
+      startTime: sTime,
+      endTime: eTime,
+      title: stamp.title,
+      description: "",
+      location: destination,
+      duration: stamp.duration,
+      estimatedCost: stamp.defaultCost,
+      category: stamp.category,
+      bookingStatus: "wishlist",
+    }
+
+    setDays((prev) =>
+      prev.map((d) =>
+        d.dayNumber === activeDayNumber ? { ...d, activities: [...d.activities, newAct] } : d
+      )
+    )
+
+    toast({
+      title: `${stamp.icon} Stamp Added`,
+      description: `"${stamp.title}" added to Day ${activeDayNumber}.`,
+    })
+  }
+
+  // Move Activity between Days
+  const handleMoveActivityToDay = (activityId: string, targetDayNumber: number) => {
+    if (targetDayNumber === activeDayNumber) return
+    let movingAct: ActivityItem | null = null
+
+    setDays((prev) => {
+      const fromDay = prev.find((d) => d.dayNumber === activeDayNumber)
+      if (!fromDay) return prev
+      movingAct = fromDay.activities.find((a) => a.id === activityId) || null
+      if (!movingAct) return prev
+
+      return prev.map((d) => {
+        if (d.dayNumber === activeDayNumber) {
+          return { ...d, activities: d.activities.filter((a) => a.id !== activityId) }
+        }
+        if (d.dayNumber === targetDayNumber) {
+          return { ...d, activities: [...d.activities, movingAct!] }
+        }
+        return d
+      })
+    })
+
+    if (movingAct) {
+      toast({
+        title: "Moved Activity",
+        description: `Moved "${(movingAct as ActivityItem).title}" to Day ${targetDayNumber}.`,
+      })
+    }
+  }
+
+  // Booking Status Cycle: Wishlist -> Reserved -> Booked
+  const handleToggleBooking = (id: string, nextStatus: "wishlist" | "reserved" | "booked") => {
+    setDays((prev) =>
+      prev.map((d) => ({
+        ...d,
+        activities: d.activities.map((a) =>
+          a.id === id ? { ...a, bookingStatus: nextStatus, isBooked: nextStatus === "booked" } : a
+        ),
+      }))
+    )
+  }
+
+  // Route Optimization (TSP 2-Opt)
+  const handleOptimizeRoute = (optimizedActivities: ActivityItem[]) => {
+    let currentStart = activeDay.activities[0]?.startTime || "09:00"
+    const reChained = optimizedActivities.map((act) => {
+      const dur = act.duration || "1.5h"
+      const end = calculateEndTimeFromDuration(currentStart, dur)
+      const updated: ActivityItem = {
+        ...act,
+        startTime: currentStart,
+        endTime: end,
+        time: `${currentStart} — ${end}`,
+      }
+      currentStart = end
+      return updated
+    })
+
+    setDays((prev) =>
+      prev.map((d) =>
+        d.dayNumber === activeDayNumber ? { ...d, activities: reChained } : d
+      )
+    )
+  }
+
+  // Calendar .ics Export Handler
+  const handleExportCalendar = () => {
+    exportToICalendar(tripTitle, destination, startDate, days)
+    toast({
+      title: "📅 Calendar (.ics) Exported",
+      description: "Downloaded itinerary for Apple, Google, and Outlook Calendars.",
+    })
+  }
+
+  // Bucket List Scratchpad Handlers
+  const handleAddStagedItem = (item: StagedItem) => {
+    setStagedItems((prev) => [item, ...prev])
+    toast({
+      title: "Saved to Bucket List",
+      description: `"${item.title}" staged in your scratchpad tray.`,
+    })
+  }
+
+  const handleRemoveStagedItem = (id: string) => {
+    setStagedItems((prev) => prev.filter((i) => i.id !== id))
+  }
+
+  const handleMoveStagedToDay = (item: StagedItem, targetDayNumber: number) => {
+    const sTime = defaultStartTime
+    const dur = "1.5h"
+    const eTime = calculateEndTimeFromDuration(sTime, dur)
+    const newAct: ActivityItem = {
+      id: `act-${Date.now()}`,
+      time: `${sTime} — ${eTime}`,
+      startTime: sTime,
+      endTime: eTime,
+      title: item.title,
+      description: item.notes || "",
+      location: item.location || destination,
+      duration: dur,
+      estimatedCost: item.estimatedCost || "Free",
+      category: item.category || "Sightseeing",
+      bookingStatus: "wishlist",
+    }
+
+    setDays((prev) =>
+      prev.map((d) =>
+        d.dayNumber === targetDayNumber
+          ? { ...d, activities: [...d.activities, newAct] }
+          : d
+      )
+    )
+
+    handleRemoveStagedItem(item.id)
+    toast({
+      title: `Moved to Day ${targetDayNumber}`,
+      description: `"${item.title}" placed on Day ${targetDayNumber} itinerary.`,
+    })
+  }
+
+  // Detailed Modal Activity Form Handlers
   const handleSaveActivity = (e: React.FormEvent) => {
     e.preventDefault()
     if (!newActTitle.trim()) return
@@ -436,6 +819,7 @@ function ManualPlannerContent() {
       duration: newActDuration.trim() || "1.5h",
       estimatedCost: cleanCost ? cleanCost : "Free",
       category: newActCat,
+      bookingStatus: "wishlist",
     }
 
     setDays((prev) =>
@@ -449,8 +833,8 @@ function ManualPlannerContent() {
     setNewActLoc("")
     setNewActCost("")
     setNewActDuration("1.5h")
-    setNewActStartTime("10:00")
-    setNewActEndTime("11:30")
+    setNewActStartTime(newActivity.endTime || "12:00")
+    setNewActEndTime(calculateEndTimeFromDuration(newActivity.endTime || "12:00", "1.5h"))
     setIsAddingActivity(false)
     setShowMoreAddFields(false)
 
@@ -463,7 +847,6 @@ function ManualPlannerContent() {
   const handleStartEdit = (act: ActivityItem) => {
     setEditingActId(act.id)
 
-    // Resolve start and end times
     let sTime = act.startTime || ""
     let eTime = act.endTime || ""
     if (!sTime && act.time) {
@@ -540,24 +923,6 @@ function ManualPlannerContent() {
     })
   }
 
-  const handleMoveActivity = (dayNum: number, actId: string, direction: "up" | "down") => {
-    setDays((prev) =>
-      prev.map((d) => {
-        if (d.dayNumber !== dayNum) return d
-        const idx = d.activities.findIndex((a) => a.id === actId)
-        if (idx === -1) return d
-        const targetIdx = direction === "up" ? idx - 1 : idx + 1
-        if (targetIdx < 0 || targetIdx >= d.activities.length) return d
-
-        const newActs = [...d.activities]
-        const temp = newActs[idx]
-        newActs[idx] = newActs[targetIdx]
-        newActs[targetIdx] = temp
-        return { ...d, activities: newActs }
-      })
-    )
-  }
-
   const handleDeleteActivity = (activityId: string) => {
     setDays((prev) =>
       prev.map((d) =>
@@ -572,7 +937,7 @@ function ManualPlannerContent() {
     })
   }
 
-  // AI Suggest Stop (Requirement 9)
+  // AI Suggest Stop
   const handleAiSuggestStop = async () => {
     if (isSuggesting) return
     setIsSuggesting(true)
@@ -591,7 +956,7 @@ function ManualPlannerContent() {
 
       const data = await res.json()
       if (data.activity) {
-        const sTime = data.activity.startTime || data.activity.time || "15:00"
+        const sTime = data.activity.startTime || data.activity.time || defaultStartTime
         const dur = data.activity.duration || "1.5h"
         const eTime = data.activity.endTime || calculateEndTimeFromDuration(sTime, dur)
         const formattedTime = sTime && eTime ? `${sTime} — ${eTime}` : sTime
@@ -609,6 +974,7 @@ function ManualPlannerContent() {
             ? String(data.activity.estimatedCost).replace(/[^0-9.]/g, "")
             : "Free",
           category: data.activity.category || "Sightseeing",
+          bookingStatus: "wishlist",
         }
 
         setDays((prev) =>
@@ -635,7 +1001,7 @@ function ManualPlannerContent() {
     }
   }
 
-  // Copy Dossier (Requirement 9)
+  // Copy Dossier
   const handleCopyItinerary = () => {
     const totalCostFormatted = formatCurrency(totalPlannedCost, currency)
     const targetBudgetFormatted = formatCurrency(numericTargetBudget, currency)
@@ -662,6 +1028,7 @@ function ManualPlannerContent() {
           text += `  • ${timeDisplay} — ${a.title} [${a.category || "Sightseeing"}] (${a.duration || "1.5h"})\n`
           if (a.location) text += `    Location: ${a.location}\n`
           text += `    Cost: ${costStr}\n`
+          if (a.bookingStatus) text += `    Booking: ${a.bookingStatus.toUpperCase()}\n`
           if (a.description) text += `    Details: ${a.description}\n`
         })
       }
@@ -677,14 +1044,12 @@ function ManualPlannerContent() {
 
   // Save Trip to Store
   const handleSaveTrip = () => {
-    const matchedDest = DESTINATIONS.find(
-      (d) =>
-        d.name.toLowerCase() === destination.toLowerCase() ||
-        destination.toLowerCase().includes(d.name.toLowerCase())
-    )
-    const coverImage = matchedDest
-      ? matchedDest.image
-      : "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80"
+    const coverImage =
+      DESTINATIONS.find(
+        (d) =>
+          d.name.toLowerCase() === destination.toLowerCase() ||
+          destination.toLowerCase().includes(d.name.toLowerCase())
+      )?.image || "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1600&q=80"
 
     const newTripId = `trip-${Date.now()}`
     const newTrip: StoredTrip = {
@@ -701,7 +1066,7 @@ function ManualPlannerContent() {
       planningMode: "Manual Studio",
       coverImage: coverImage,
       notes: notes,
-      coordinates: [40.634, 14.6027],
+      coordinates: destinationCenter,
       days: days.map((d) => ({
         dayNumber: d.dayNumber,
         title: d.title,
@@ -716,6 +1081,7 @@ function ManualPlannerContent() {
           duration: a.duration,
           estimatedCost: a.estimatedCost ? String(a.estimatedCost) : "Free",
           category: a.category,
+          bookingStatus: a.bookingStatus,
         })),
       })),
       createdAt: new Date().toISOString(),
@@ -732,7 +1098,7 @@ function ManualPlannerContent() {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 max-w-5xl mx-auto pb-24 px-3 sm:px-0">
-      {/* ─── 1. TOP HEADER & QUICK CONTROLS ──────────────────────────────── */}
+      {/* ─── 1. TOP HEADER & STUDIO QUICK CONTROLS ───────────────────────── */}
       <div className="glass-shell p-5 sm:p-6 rounded-3xl border border-white/15 shadow-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1.5 flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -791,6 +1157,48 @@ function ManualPlannerContent() {
             ))}
           </div>
 
+          {/* Bucket List Drawer Button */}
+          <button
+            type="button"
+            onClick={() => setIsScratchpadOpen(true)}
+            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Open unassigned bucket list tray"
+          >
+            <Bookmark className="w-3.5 h-3.5 text-[#e8d5b5]" />
+            <span className="hidden sm:inline">Bucket List</span>
+            {stagedItems.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-[#e8d5b5] text-[#050a10] text-[9px] font-bold flex items-center justify-center">
+                {stagedItems.length}
+              </span>
+            )}
+          </button>
+
+          {/* Route Map Toggle Button */}
+          <button
+            type="button"
+            onClick={() => setIsMapOpen(!isMapOpen)}
+            className={`glass-pill px-3 py-2 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+              isMapOpen
+                ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 shadow-sm"
+                : "text-slate-300 hover:text-white"
+            }`}
+            title="Toggle interactive route map & spatial optimizer"
+          >
+            <MapPin className="w-3.5 h-3.5 text-[#38bdf8]" />
+            <span className="hidden sm:inline">{isMapOpen ? "Hide Map" : "Route Map"}</span>
+          </button>
+
+          {/* Calendar (.ics) Export Button */}
+          <button
+            type="button"
+            onClick={handleExportCalendar}
+            className="glass-pill px-3 py-2 text-xs text-slate-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Export itinerary to Google Calendar, Apple Calendar, Outlook (.ics)"
+          >
+            <CalendarDays className="w-3.5 h-3.5 text-[#34d399]" />
+            <span className="hidden sm:inline">Export .ics</span>
+          </button>
+
           {/* Edit Trip Details Button */}
           <button
             onClick={() => setIsSettingsOpen(!isSettingsOpen)}
@@ -825,7 +1233,7 @@ function ManualPlannerContent() {
         </div>
       </div>
 
-      {/* ─── 2. COLLAPSIBLE TRIP DETAILS (Opens smoothly when user wants to edit) ─── */}
+      {/* ─── 2. COLLAPSIBLE TRIP DETAILS ─────────────────────────────────── */}
       {isSettingsOpen && (
         <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-4 animate-reveal bg-[#050a10]/80">
           <div className="flex items-center justify-between border-b border-white/10 pb-3">
@@ -1061,7 +1469,19 @@ function ManualPlannerContent() {
         </button>
       </div>
 
-      {/* ─── 5. ACTIVE DAY WORKSPACE ───────────────────────────────────────── */}
+      {/* ─── 5. INTERACTIVE MAP & ROUTE OPTIMIZER PANEL (When Opened) ─────── */}
+      {isMapOpen && (
+        <PlannerMapPanel
+          dayNumber={activeDay.dayNumber}
+          dayTitle={activeDay.title}
+          activities={activeDay.activities}
+          destinationCenter={destinationCenter}
+          onOptimizeRoute={handleOptimizeRoute}
+          onClose={() => setIsMapOpen(false)}
+        />
+      )}
+
+      {/* ─── 6. ACTIVE DAY WORKSPACE ───────────────────────────────────────── */}
       <div className="glass-shell p-5 sm:p-7 rounded-3xl border border-white/15 shadow-2xl space-y-6">
         {/* Day Header with Inline Edit and Fast Actions */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-white/10">
@@ -1126,13 +1546,23 @@ function ManualPlannerContent() {
                 className="btn-luxe px-4 py-2 text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-md"
               >
                 <Plus className="w-3.5 h-3.5 text-[#050a10]" />
-                <span>Add Activity</span>
+                <span>Form Entry</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* ─── ADD ACTIVITY FORM (Streamlined, frictionless entry) ─── */}
+        {/* ─── QUICK-ADD NATURAL LANGUAGE BAR & DAY PRESETS ─────────────────── */}
+        <QuickAddBar
+          dayNumber={activeDay.dayNumber}
+          defaultStartTime={defaultStartTime}
+          currencySymbol={currentCurrency.symbol}
+          onAddActivity={handleQuickAddActivity}
+          onApplyTemplate={handleApplyDayTemplate}
+          onApplyStamp={handleApplyQuickStamp}
+        />
+
+        {/* ─── DETAILED ADD ACTIVITY FORM (Optional Full Modal/Inline) ─────── */}
         {isAddingActivity && (
           <form
             onSubmit={handleSaveActivity}
@@ -1340,249 +1770,274 @@ function ManualPlannerContent() {
           </form>
         )}
 
-        {/* ─── ACTIVITIES TIMELINE ─────────────────────────────────────────── */}
-        <div className="space-y-3">
-          {activeDay.activities.map((act, actIdx) => {
-            if (editingActId === act.id) {
-              return (
-                <form
-                  key={act.id}
-                  onSubmit={handleSaveEdit}
-                  className="p-5 rounded-2xl glass-dock border border-[#38bdf8]/40 space-y-4 animate-reveal bg-[#050a10]/95"
-                >
-                  <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                    <span className="text-xs font-semibold text-[#38bdf8] flex items-center gap-1.5">
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit Experience
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setEditingActId(null)}
-                      className="text-slate-400 hover:text-white cursor-pointer"
+        {/* ─── DRAG-AND-DROP SORTABLE ACTIVITIES TIMELINE ─────────────────── */}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={activeDay.activities.map((a) => a.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {activeDay.activities.map((act, actIdx) => {
+                if (editingActId === act.id) {
+                  return (
+                    <form
+                      key={act.id}
+                      onSubmit={handleSaveEdit}
+                      className="p-5 rounded-2xl glass-dock border border-[#38bdf8]/40 space-y-4 animate-reveal bg-[#050a10]/95"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  {/* 1. Title */}
-                  <div className="space-y-1">
-                    <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Activity Name *</label>
-                    <input
-                      value={editTitle}
-                      onChange={(e) => setEditTitle(e.target.value)}
-                      className="w-full glass-input rounded-xl h-10 px-3 text-xs sm:text-sm text-white"
-                      required
-                    />
-                  </div>
-
-                  {/* 2. Start Time & End Time */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
-                        <Clock className="w-3 h-3 text-[#38bdf8]" />
-                        Start Time *
-                      </label>
-                      <input
-                        type="time"
-                        value={editStartTime}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setEditStartTime(val)
-                          if (val) {
-                            setEditEndTime(calculateEndTimeFromDuration(val, editDuration))
-                          }
-                        }}
-                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
-                        <Clock className="w-3 h-3 text-[#34d399]" />
-                        End Time *
-                      </label>
-                      <input
-                        type="time"
-                        value={editEndTime}
-                        onChange={(e) => {
-                          const val = e.target.value
-                          setEditEndTime(val)
-                          if (editStartTime && val) {
-                            const derived = calculateDurationFromTimes(editStartTime, val)
-                            if (derived) setEditDuration(derived)
-                          }
-                        }}
-                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  {/* 3. Location & Cost */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Location</label>
-                      <input
-                        value={editLoc}
-                        onChange={(e) => setEditLoc(e.target.value)}
-                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
-                          Cost ({currentCurrency.symbol})
-                        </label>
+                      <div className="flex items-center justify-between pb-2 border-b border-white/10">
+                        <span className="text-xs font-semibold text-[#38bdf8] flex items-center gap-1.5">
+                          <Pencil className="w-3.5 h-3.5" />
+                          Edit Experience
+                        </span>
                         <button
                           type="button"
-                          onClick={handleOpenCalcForEditActivity}
-                          className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                          onClick={() => setEditingActId(null)}
+                          className="text-slate-400 hover:text-white cursor-pointer"
                         >
-                          <Calculator className="w-2.5 h-2.5" />
-                          <span>Calc</span>
+                          <X className="w-4 h-4" />
                         </button>
                       </div>
-                      <input
-                        type="number"
-                        value={editCost}
-                        onChange={(e) => setEditCost(e.target.value)}
-                        placeholder="0 for Free"
-                        className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                      />
-                    </div>
-                  </div>
 
-                  {/* Optional More Edit Options */}
-                  {!showMoreEditFields ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowMoreEditFields(true)}
-                      className="text-[11px] text-[#38bdf8] hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer pt-1"
-                    >
-                      <span>+ Edit Category, Presets & Notes</span>
-                    </button>
-                  ) : (
-                    <div className="space-y-3 pt-2 border-t border-white/10 animate-reveal">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Category</label>
-                          <select
-                            value={editCat}
-                            onChange={(e) => setEditCat(e.target.value)}
-                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white bg-[#050a10]"
-                          >
-                            {CATEGORY_OPTIONS.map((cat) => (
-                              <option key={cat} value={cat}>
-                                {cat}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div className="space-y-1">
-                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Quick Duration Presets</label>
-                          <div className="flex flex-wrap gap-1.5 pt-0.5">
-                            {DURATION_PRESETS.map((preset) => (
-                              <button
-                                key={preset}
-                                type="button"
-                                onClick={() => {
-                                  setEditDuration(preset)
-                                  if (editStartTime) {
-                                    const end = calculateEndTimeFromDuration(editStartTime, preset)
-                                    if (end) setEditEndTime(end)
-                                  }
-                                }}
-                                className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
-                                  editDuration === preset
-                                    ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white"
-                                    : "glass-pill text-slate-400 hover:text-white"
-                                }`}
-                              >
-                                {preset}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
+                      {/* 1. Title */}
                       <div className="space-y-1">
-                        <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Description</label>
-                        <textarea
-                          value={editDesc}
-                          onChange={(e) => setEditDesc(e.target.value)}
-                          rows={2}
-                          className="w-full glass-input rounded-xl p-2.5 text-xs text-white"
+                        <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Activity Name *</label>
+                        <input
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full glass-input rounded-xl h-10 px-3 text-xs sm:text-sm text-white"
+                          required
                         />
                       </div>
-                    </div>
-                  )}
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                      {/* 2. Start Time & End Time */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                            <Clock className="w-3 h-3 text-[#38bdf8]" />
+                            Start Time *
+                          </label>
+                          <input
+                            type="time"
+                            value={editStartTime}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setEditStartTime(val)
+                              if (val) {
+                                setEditEndTime(calculateEndTimeFromDuration(val, editDuration))
+                              }
+                            }}
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                            required
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider flex items-center gap-1 font-semibold">
+                            <Clock className="w-3 h-3 text-[#34d399]" />
+                            End Time *
+                          </label>
+                          <input
+                            type="time"
+                            value={editEndTime}
+                            onChange={(e) => {
+                              const val = e.target.value
+                              setEditEndTime(val)
+                              if (editStartTime && val) {
+                                const derived = calculateDurationFromTimes(editStartTime, val)
+                                if (derived) setEditDuration(derived)
+                              }
+                            }}
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* 3. Location & Cost */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Location</label>
+                          <input
+                            value={editLoc}
+                            onChange={(e) => setEditLoc(e.target.value)}
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                              Cost ({currentCurrency.symbol})
+                            </label>
+                            <button
+                              type="button"
+                              onClick={handleOpenCalcForEditActivity}
+                              className="text-[9px] text-[#38bdf8] hover:text-white flex items-center gap-1 cursor-pointer font-medium"
+                            >
+                              <Calculator className="w-2.5 h-2.5" />
+                              <span>Calc</span>
+                            </button>
+                          </div>
+                          <input
+                            type="number"
+                            value={editCost}
+                            onChange={(e) => setEditCost(e.target.value)}
+                            placeholder="0 for Free"
+                            className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Optional More Edit Options */}
+                      {!showMoreEditFields ? (
+                        <button
+                          type="button"
+                          onClick={() => setShowMoreEditFields(true)}
+                          className="text-[11px] text-[#38bdf8] hover:text-white flex items-center gap-1 font-medium transition-colors cursor-pointer pt-1"
+                        >
+                          <span>+ Edit Category, Presets & Notes</span>
+                        </button>
+                      ) : (
+                        <div className="space-y-3 pt-2 border-t border-white/10 animate-reveal">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Category</label>
+                              <select
+                                value={editCat}
+                                onChange={(e) => setEditCat(e.target.value)}
+                                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white bg-[#050a10]"
+                              >
+                                {CATEGORY_OPTIONS.map((cat) => (
+                                  <option key={cat} value={cat}>
+                                    {cat}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Quick Duration Presets</label>
+                              <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                {DURATION_PRESETS.map((preset) => (
+                                  <button
+                                    key={preset}
+                                    type="button"
+                                    onClick={() => {
+                                      setEditDuration(preset)
+                                      if (editStartTime) {
+                                        const end = calculateEndTimeFromDuration(editStartTime, preset)
+                                        if (end) setEditEndTime(end)
+                                      }
+                                    }}
+                                    className={`text-[10px] px-2 py-0.5 rounded-full border transition-all cursor-pointer ${
+                                      editDuration === preset
+                                        ? "bg-[#38bdf8]/20 border-[#38bdf8] text-white"
+                                        : "glass-pill text-slate-400 hover:text-white"
+                                    }`}
+                                  >
+                                    {preset}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="space-y-1">
+                            <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Description</label>
+                            <textarea
+                              value={editDesc}
+                              onChange={(e) => setEditDesc(e.target.value)}
+                              rows={2}
+                              className="w-full glass-input rounded-xl p-2.5 text-xs text-white"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="flex justify-end gap-2 pt-2 border-t border-white/10">
+                        <button
+                          type="button"
+                          onClick={() => setEditingActId(null)}
+                          className="glass-pill px-4 py-2 text-xs text-white cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="submit"
+                          className="btn-luxe px-5 py-2 text-xs font-semibold cursor-pointer shadow-lg"
+                        >
+                          Save Changes
+                        </button>
+                      </div>
+                    </form>
+                  )
+                }
+
+                return (
+                  <SortableActivityCard
+                    key={act.id}
+                    activity={act}
+                    index={actIdx}
+                    allDayNumbers={allDayNumbers}
+                    currentDayNumber={activeDay.dayNumber}
+                    currencySymbol={currentCurrency.symbol}
+                    transitToNext={transitEstimates[actIdx]}
+                    onDelete={handleDeleteActivity}
+                    onEdit={handleStartEdit}
+                    onToggleBooking={handleToggleBooking}
+                    onMoveToDay={handleMoveActivityToDay}
+                  />
+                )
+              })}
+
+              {activeDay.activities.length === 0 && !isAddingActivity && (
+                <div className="text-center py-12 glass-card rounded-2xl border border-white/10 space-y-3">
+                  <Clock className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
+                  <p className="text-xs text-[#94a3b8]">
+                    No activities planned for {activeDay.title} yet.
+                  </p>
+                  <div className="flex items-center justify-center gap-2 pt-1">
                     <button
-                      type="button"
-                      onClick={() => setEditingActId(null)}
-                      className="glass-pill px-4 py-2 text-xs text-white cursor-pointer"
+                      onClick={handleAiSuggestStop}
+                      disabled={isSuggesting}
+                      className="glass-pill px-4 py-2 text-xs text-[#e8d5b5] hover:text-white rounded-full cursor-pointer flex items-center gap-1.5"
                     >
-                      Cancel
+                      <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+                      <span>AI Suggest Stop</span>
                     </button>
                     <button
-                      type="submit"
-                      className="btn-luxe px-5 py-2 text-xs font-semibold cursor-pointer shadow-lg"
+                      onClick={() => setIsAddingActivity(true)}
+                      className="btn-luxe px-4 py-2 text-xs font-semibold rounded-full cursor-pointer"
                     >
-                      Save Changes
+                      + Form Entry
                     </button>
                   </div>
-                </form>
-              )
-            }
-
-            return (
-              <ActivityCard
-                key={act.id}
-                activity={act}
-                onDelete={handleDeleteActivity}
-                onEdit={handleStartEdit}
-                onMoveUp={() => handleMoveActivity(activeDay.dayNumber, act.id, "up")}
-                onMoveDown={() => handleMoveActivity(activeDay.dayNumber, act.id, "down")}
-                canMoveUp={actIdx > 0}
-                canMoveDown={actIdx < activeDay.activities.length - 1}
-                currencySymbol={currentCurrency.symbol}
-                editable={true}
-              />
-            )
-          })}
-
-          {activeDay.activities.length === 0 && !isAddingActivity && (
-            <div className="text-center py-12 glass-card rounded-2xl border border-white/10 space-y-3">
-              <Clock className="w-8 h-8 text-[#94a3b8] mx-auto stroke-1" />
-              <p className="text-xs text-[#94a3b8]">
-                No activities planned for {activeDay.title} yet.
-              </p>
-              <div className="flex items-center justify-center gap-2 pt-1">
-                <button
-                  onClick={handleAiSuggestStop}
-                  disabled={isSuggesting}
-                  className="glass-pill px-4 py-2 text-xs text-[#e8d5b5] hover:text-white rounded-full cursor-pointer flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
-                  <span>AI Suggest Stop</span>
-                </button>
-                <button
-                  onClick={() => setIsAddingActivity(true)}
-                  className="btn-luxe px-4 py-2 text-xs font-semibold rounded-full cursor-pointer"
-                >
-                  + Add Experience
-                </button>
-              </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
-      {/* Interactive Trip Financial & Split Calculator Modal */}
+      {/* ─── 7. BUCKET LIST / SCRATCHPAD TRAY DRAWER ─────────────────────── */}
+      <ScratchpadTray
+        isOpen={isScratchpadOpen}
+        onClose={() => setIsScratchpadOpen(false)}
+        stagedItems={stagedItems}
+        activeDayNumber={activeDay.dayNumber}
+        allDayNumbers={allDayNumbers}
+        currencySymbol={currentCurrency.symbol}
+        onAddItem={handleAddStagedItem}
+        onRemoveItem={handleRemoveStagedItem}
+        onMoveToDay={handleMoveStagedToDay}
+      />
+
+      {/* ─── 8. INTERACTIVE TRIP FINANCIAL CALCULATOR MODAL ───────────────── */}
       <TripCalculator
         isOpen={isCalcOpen}
         onClose={() => setIsCalcOpen(false)}
