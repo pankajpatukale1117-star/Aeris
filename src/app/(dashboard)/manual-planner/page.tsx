@@ -120,78 +120,9 @@ const CATEGORY_OPTIONS = [
 
 const DURATION_PRESETS = ["30m", "45m", "1h", "1.5h", "2h", "3h", "Half Day", "Full Day"]
 
-const DEFAULT_DAYS: ManualDay[] = [
-  {
-    dayNumber: 1,
-    title: "Arrival & Coastal Check-in",
-    activities: [
-      {
-        id: "m-1",
-        time: "14:00 — 15:00",
-        startTime: "14:00",
-        endTime: "15:00",
-        title: "Check into Cliffside Villa",
-        description: "Unpack and take in panoramic views of the Tyrrhenian Sea.",
-        location: "Positano",
-        duration: "1h",
-        estimatedCost: "350",
-        category: "Stay",
-        bookingStatus: "reserved",
-      },
-      {
-        id: "m-2",
-        time: "18:00 — 19:30",
-        startTime: "18:00",
-        endTime: "19:30",
-        title: "Sunset Aperitivo at Franco's Bar",
-        description: "Chilled Prosecco and local olives overlooking the hillside.",
-        location: "Positano Village",
-        duration: "1.5h",
-        estimatedCost: "40",
-        category: "Dining",
-        bookingStatus: "wishlist",
-      },
-    ],
-  },
-  {
-    dayNumber: 2,
-    title: "Path of the Gods Hike",
-    activities: [
-      {
-        id: "m-3",
-        time: "08:30 — 12:00",
-        startTime: "08:30",
-        endTime: "12:00",
-        title: "Sentiero degli Dei Trek",
-        description: "Breathtaking coastal hiking trail high above the sea between Bomerano and Nocelle.",
-        location: "Bomerano",
-        duration: "3.5h",
-        estimatedCost: "Free",
-        category: "Adventure",
-        bookingStatus: "wishlist",
-      },
-    ],
-  },
-]
+const DEFAULT_DAYS: ManualDay[] = []
 
-const DEFAULT_STAGED_ITEMS: StagedItem[] = [
-  {
-    id: "staged-1",
-    title: "Gelato tasting at Buca di Bacco",
-    location: "Spiaggia Grande",
-    estimatedCost: "15",
-    category: "Dining",
-    notes: "Try pistachio and lemon gelato",
-  },
-  {
-    id: "staged-2",
-    title: "Private sunset boat to Faraglioni rocks",
-    location: "Marina Grande, Capri",
-    estimatedCost: "220",
-    category: "Adventure",
-    notes: "Requires advance booking before 4 PM",
-  },
-]
+const DEFAULT_STAGED_ITEMS: StagedItem[] = []
 
 const STORAGE_KEY = "roveo_manual_draft_v1"
 const SCRATCHPAD_KEY = "roveo_manual_scratchpad_v1"
@@ -278,24 +209,27 @@ function ManualPlannerContent() {
   const { toast } = useToast()
   const addTrip = useTravelStore((state) => state.addTrip)
 
-  const prefillDestination = searchParams.get("destination") || "Amalfi Coast, Italy"
+  const prefillDestination = searchParams.get("destination") || ""
   const defaultInitialStart = getUpcomingDateString(14)
   const defaultInitialEnd = addDaysToDate(defaultInitialStart, 3)
 
-  // Trip Master Header State
-  const [tripTitle, setTripTitle] = React.useState("Custom Mediterranean Getaway")
+  // Trip Master Header State (Clean Canvas - No Forced Mock Templates)
+  const [tripTitle, setTripTitle] = React.useState("")
   const [destination, setDestination] = React.useState(prefillDestination)
-  const [startDate, setStartDate] = React.useState("2026-09-10")
-  const [endDate, setEndDate] = React.useState("2026-09-11")
+  const [startDate, setStartDate] = React.useState(defaultInitialStart)
+  const [endDate, setEndDate] = React.useState(defaultInitialEnd)
   const [travelers, setTravelers] = React.useState(2)
-  const [budget, setBudget] = React.useState("3000")
+  const [budget, setBudget] = React.useState("")
   const [currency, setCurrency] = React.useState<CurrencyCode>("USD")
-  const [notes, setNotes] = React.useState("Remember to book ferry between Positano and Capri.")
+  const [notes, setNotes] = React.useState("")
+
+  // Delete Trip Confirmation Modal State
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false)
 
   // First-Time Setup Wizard Modal State
   const [isSetupModalOpen, setIsSetupModalOpen] = React.useState(false)
 
-  // Days and activities state
+  // Days and activities state (Clean - No Templates)
   const [days, setDays] = React.useState<ManualDay[]>(DEFAULT_DAYS)
   const [activeDayNumber, setActiveDayNumber] = React.useState(1)
 
@@ -316,6 +250,16 @@ function ManualPlannerContent() {
       const savedDraft = localStorage.getItem(STORAGE_KEY)
       if (savedDraft) {
         const parsed = JSON.parse(savedDraft)
+        // Clean out legacy hardcoded Mediterranean mock template
+        if (
+          parsed.tripTitle === "Custom Mediterranean Getaway" &&
+          (parsed.destination === "Amalfi Coast, Italy" || !parsed.destination)
+        ) {
+          localStorage.removeItem(STORAGE_KEY)
+          localStorage.removeItem(SCRATCHPAD_KEY)
+          return
+        }
+
         if (parsed.tripTitle) setTripTitle(parsed.tripTitle)
         if (parsed.destination) setDestination(parsed.destination)
         if (parsed.startDate) setStartDate(parsed.startDate)
@@ -330,9 +274,6 @@ function ManualPlannerContent() {
         if (parsed.days && Array.isArray(parsed.days) && parsed.days.length > 0) {
           setDays(parsed.days)
         }
-      } else {
-        // If visiting fresh with no saved draft, automatically launch the trip genesis wizard
-        setIsSetupModalOpen(true)
       }
 
       const savedStaged = localStorage.getItem(SCRATCHPAD_KEY)
@@ -359,6 +300,11 @@ function ManualPlannerContent() {
   // Auto-save draft changes
   React.useEffect(() => {
     if (!isLoadedFromStorage) return
+    if (days.length === 0 && !destination && !tripTitle) {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(SCRATCHPAD_KEY)
+      return
+    }
     const timeout = setTimeout(() => {
       try {
         const draft = {
@@ -384,27 +330,33 @@ function ManualPlannerContent() {
     return () => clearTimeout(timeout)
   }, [tripTitle, destination, startDate, endDate, travelers, budget, currency, notes, days, stagedItems, isLoadedFromStorage])
 
-  const handleResetTemplate = () => {
+  // Permanent Delete Trip Handler (Easily clear itinerary and restart fresh)
+  const handleDeleteTrip = () => {
     try {
       localStorage.removeItem(STORAGE_KEY)
       localStorage.removeItem(SCRATCHPAD_KEY)
     } catch {}
-    setTripTitle("Custom Mediterranean Getaway")
-    setDestination("Amalfi Coast, Italy")
-    setStartDate("2026-09-10")
-    setEndDate("2026-09-11")
-    setBudget("3000")
+
+    setTripTitle("")
+    setDestination("")
+    setStartDate(getUpcomingDateString(14))
+    setEndDate(addDaysToDate(getUpcomingDateString(14), 3))
+    setBudget("")
     setTravelers(2)
-    setCurrency("USD")
-    setNotes("Remember to book ferry between Positano and Capri.")
-    setDays(DEFAULT_DAYS)
-    setStagedItems(DEFAULT_STAGED_ITEMS)
+    setNotes("")
+    setDays([])
+    setStagedItems([])
     setActiveDayNumber(1)
+    setIsDeleteConfirmOpen(false)
+    setIsSettingsOpen(false)
+
     toast({
-      title: "Template Reset",
-      description: "Restored the default Mediterranean template.",
+      title: "🗑️ Trip Itinerary Deleted",
+      description: "All planned days, activities, and budget telemetry have been cleared.",
     })
   }
+
+  const handleResetTemplate = handleDeleteTrip
 
   // Active Currency Config
   const currentCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]
@@ -1325,58 +1277,82 @@ function ManualPlannerContent() {
 
             <div className="flex items-center gap-2">
               <h1 className="font-editorial text-2xl sm:text-3xl font-bold tracking-tight text-white truncate max-w-xl">
-                {tripTitle || "Custom Mediterranean Getaway"}
+                {tripTitle || (destination ? `Expedition to ${destination.split(",")[0]}` : "Custom Trip Plan")}
               </h1>
-              <button
-                onClick={openTripDetails}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-[#38bdf8] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
-                title="Edit Trip Details"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
+              {days.length > 0 && (
+                <button
+                  onClick={openTripDetails}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-[#38bdf8] hover:bg-white/5 transition-colors cursor-pointer shrink-0"
+                  title="Edit Trip Details"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-3 text-xs text-slate-300 flex-wrap">
               <span className="flex items-center gap-1 text-slate-300">
                 <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
-                {destination || "Amalfi Coast, Italy"}
+                {destination || "No destination selected"}
               </span>
               <span className="text-slate-600">•</span>
               <span className="flex items-center gap-1 text-slate-300">
                 <Calendar className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                {dateRangeText || "Sep 10 — Sep 11 (2 Days)"}
+                {days.length > 0 ? dateRangeText : "Timeline not configured"}
               </span>
               <span className="text-slate-600">•</span>
               <span className="flex items-center gap-1 text-slate-300">
                 <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                {travelers} {travelers === 1 ? "Traveler" : "Travelers"}
+                {travelers} {travelers === 1 ? "Member" : "Members"}
               </span>
             </div>
           </div>
 
           {/* Top Right: Core Journey Actions */}
-          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
-            <button
-              onClick={openTripDetails}
-              className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              Trip Details
-            </button>
-            <button
-              onClick={handleCopy}
-              className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              Copy
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-4 py-1.5 rounded-xl bg-[#e8d5b5] text-slate-900 font-medium text-xs hover:bg-[#dfcaa7] transition-colors flex items-center gap-1.5 shadow-md cursor-pointer"
-            >
-              <Bookmark className="w-3.5 h-3.5" />
-              Save Journey
-            </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+            {days.length > 0 ? (
+              <>
+                <button
+                  onClick={openTripDetails}
+                  className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Trip Details
+                </button>
+                <button
+                  onClick={handleCopy}
+                  className="px-3.5 py-1.5 rounded-xl border border-white/15 text-xs text-slate-200 hover:bg-white/10 transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl border border-rose-500/35 bg-rose-500/10 text-xs text-rose-300 hover:bg-rose-500/20 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+                  title="Delete this entire trip itinerary"
+                >
+                  <Trash2 className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Delete Trip</span>
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-1.5 rounded-xl bg-[#e8d5b5] text-slate-900 font-medium text-xs hover:bg-[#dfcaa7] transition-colors flex items-center gap-1.5 shadow-md cursor-pointer"
+                >
+                  <Bookmark className="w-3.5 h-3.5" />
+                  Save Journey
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setIsSetupModalOpen(true)}
+                className="btn-luxe px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 cursor-pointer shadow-lg"
+              >
+                <PlusCircle className="w-3.5 h-3.5 text-[#050a10]" />
+                <span>Plan a Trip</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -1405,10 +1381,10 @@ function ManualPlannerContent() {
               type="button"
               onClick={() => setIsSetupModalOpen(true)}
               className="px-3 py-1.5 rounded-xl border border-[#38bdf8]/35 bg-[#38bdf8]/10 text-xs text-[#38bdf8] hover:bg-[#38bdf8]/20 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
-              title="Plan new trip: enter location, dates, days & budget"
+              title="Plan a trip: enter location, dates, days & budget"
             >
               <PlusCircle className="w-3.5 h-3.5" />
-              <span>New Trip</span>
+              <span>{days.length === 0 ? "Plan a Trip" : "New Trip"}</span>
             </button>
             <button
               onClick={toggleBucketList}
@@ -1443,48 +1419,104 @@ function ManualPlannerContent() {
         </div>
       </div>
 
-      {/* ─── 2. COLLAPSIBLE TRIP DETAILS & ARCHITECTURE DRAWER ───────────── */}
-      {isSettingsOpen && (
-        <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-5 animate-reveal bg-[#050a10]/85">
-          {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
-            <div className="flex items-center gap-2">
-              <span className="editorial-tag text-[#e8d5b5] flex items-center gap-1.5 text-xs">
-                <Sliders className="w-3.5 h-3.5 text-[#38bdf8]" />
-                Trip Architecture & Parameters
-              </span>
-              <span className="text-[10px] text-slate-400 font-mono glass-pill px-2 py-0.5 rounded-full border border-white/10">
-                Location → Dates → Days → Budget
-              </span>
-            </div>
+      {/* ─── 2. MAIN PLANNER WORKSPACE OR "PLAN A TRIP" SIGN ──────────────── */}
+      {days.length === 0 ? (
+        <div className="glass-shell p-8 sm:p-12 rounded-3xl border border-white/20 shadow-2xl text-center space-y-6 max-w-2xl mx-auto my-8 animate-in fade-in duration-500 bg-[#050a10]/90">
+          <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-[#e8d5b5]/20 to-[#38bdf8]/20 border border-[#e8d5b5]/30 flex items-center justify-center mx-auto shadow-xl">
+            <Compass className="w-8 h-8 text-[#e8d5b5] animate-pulse" />
+          </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setIsSetupModalOpen(true)}
-                className="text-xs text-[#38bdf8] hover:text-white glass-pill px-3 py-1 rounded-full border border-[#38bdf8]/30 bg-[#38bdf8]/10 flex items-center gap-1 cursor-pointer transition-all"
-                title="Open 4-step Trip Genesis Wizard"
-              >
-                <Compass className="w-3 h-3" />
-                <span>Launch Wizard</span>
-              </button>
-              <button
-                type="button"
-                onClick={handleResetTemplate}
-                className="text-xs text-rose-400/80 hover:text-rose-300 flex items-center gap-1 cursor-pointer px-2 py-1"
-                title="Reset to default template"
-              >
-                <RotateCcw className="w-3 h-3" />
-                <span>Reset</span>
-              </button>
-              <button
-                onClick={() => setIsSettingsOpen(false)}
-                className="text-xs text-slate-200 hover:text-white glass-pill px-3 py-1 rounded-full cursor-pointer bg-white/10"
-              >
-                Done ✓
-              </button>
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 glass-pill px-3 py-1 rounded-full text-xs uppercase tracking-wider text-[#38bdf8]">
+              <Sparkles className="w-3.5 h-3.5 text-[#38bdf8]" />
+              <span>ROVEO Bespoke Studio</span>
+            </div>
+            <h2 className="font-editorial text-3xl sm:text-4xl font-bold text-white tracking-tight">
+              Plan Your Trip
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-300 max-w-lg mx-auto">
+              Start with a completely clean slate. Choose your destination, travel dates, party members, and budget. ROVEO will engineer your timeline, daily cadences, and equal member split.
+            </p>
+          </div>
+
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsSetupModalOpen(true)}
+              className="btn-luxe px-8 py-3.5 rounded-2xl text-xs sm:text-sm font-semibold flex items-center gap-2 cursor-pointer shadow-2xl hover:scale-[1.02] transition-transform w-full sm:w-auto justify-center"
+            >
+              <PlusCircle className="w-4 h-4 text-[#050a10]" />
+              <span>+ Plan a Trip</span>
+            </button>
+          </div>
+
+          {/* Quick Destination Inspiration */}
+          <div className="pt-4 border-t border-white/10 space-y-2">
+            <span className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">
+              Or pick a sanctuary to start:
+            </span>
+            <div className="flex flex-wrap justify-center gap-1.5">
+              {POPULAR_DESTINATIONS.slice(0, 8).map((dest) => (
+                <button
+                  key={dest.name}
+                  type="button"
+                  onClick={() => {
+                    setDestination(dest.name)
+                    setIsSetupModalOpen(true)
+                  }}
+                  className="glass-pill px-3 py-1 rounded-full text-xs text-slate-300 hover:text-white hover:border-[#38bdf8]/40 transition-all cursor-pointer flex items-center gap-1"
+                >
+                  <span>{dest.icon}</span>
+                  <span>{dest.label}</span>
+                </button>
+              ))}
             </div>
           </div>
+        </div>
+      ) : (
+        <>
+          {/* ─── 2. COLLAPSIBLE TRIP DETAILS & ARCHITECTURE DRAWER ───────────── */}
+          {isSettingsOpen && (
+            <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-5 animate-reveal bg-[#050a10]/85">
+              {/* Header */}
+              <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="editorial-tag text-[#e8d5b5] flex items-center gap-1.5 text-xs">
+                    <Sliders className="w-3.5 h-3.5 text-[#38bdf8]" />
+                    Trip Architecture & Parameters
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono glass-pill px-2 py-0.5 rounded-full border border-white/10">
+                    Location → Dates → Days → Budget
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsSetupModalOpen(true)}
+                    className="text-xs text-[#38bdf8] hover:text-white glass-pill px-3 py-1 rounded-full border border-[#38bdf8]/30 bg-[#38bdf8]/10 flex items-center gap-1 cursor-pointer transition-all"
+                    title="Open 4-step Trip Genesis Wizard"
+                  >
+                    <Compass className="w-3 h-3" />
+                    <span>Launch Wizard</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsDeleteConfirmOpen(true)}
+                    className="text-xs text-rose-400 hover:text-rose-300 glass-pill px-3 py-1 rounded-full border border-rose-500/30 bg-rose-500/10 flex items-center gap-1 cursor-pointer transition-all"
+                    title="Permanently delete this trip itinerary"
+                  >
+                    <Trash2 className="w-3 h-3 text-rose-400" />
+                    <span>Delete Trip</span>
+                  </button>
+                  <button
+                    onClick={() => setIsSettingsOpen(false)}
+                    className="text-xs text-slate-200 hover:text-white glass-pill px-3 py-1 rounded-full cursor-pointer bg-white/10"
+                  >
+                    Done ✓
+                  </button>
+                </div>
+              </div>
 
           {/* Core Configuration 3-Column Architecture Grid */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
@@ -2481,6 +2513,8 @@ function ManualPlannerContent() {
           </SortableContext>
         </DndContext>
       </div>
+        </>
+      )}
 
       {/* ─── 7. BUCKET LIST / SCRATCHPAD TRAY DRAWER ─────────────────────── */}
       <ScratchpadTray
@@ -2519,6 +2553,41 @@ function ManualPlannerContent() {
         currentBudget={numericTargetBudget}
         onApplySetup={handleApplyTripSetup}
       />
+
+      {/* ─── 10. DELETE TRIP CONFIRMATION MODAL ────────────────────────────── */}
+      {isDeleteConfirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md glass-shell border border-rose-500/40 rounded-3xl p-6 space-y-4 bg-[#050a10]/95 shadow-2xl">
+            <div className="w-12 h-12 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 mx-auto">
+              <Trash2 className="w-6 h-6" />
+            </div>
+            <div className="text-center space-y-1">
+              <h3 className="text-lg font-bold text-white font-editorial">
+                Delete Trip Itinerary?
+              </h3>
+              <p className="text-xs text-slate-300">
+                Are you sure you want to delete <span className="text-rose-300 font-semibold">&ldquo;{tripTitle || destination || "this trip"}&rdquo;</span>? This will permanently remove all planned days, activities, and budget architecture.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 pt-3 border-t border-white/10">
+              <button
+                type="button"
+                onClick={() => setIsDeleteConfirmOpen(false)}
+                className="glass-pill px-4 py-2 rounded-xl text-xs text-slate-300 hover:text-white cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteTrip}
+                className="px-5 py-2 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-lg shadow-rose-500/30 cursor-pointer transition-all"
+              >
+                Yes, Delete Trip
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
