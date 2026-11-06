@@ -440,12 +440,14 @@ function ManualPlannerContent() {
 
   // 1-Click Budget Recalculator based on travel style
   const handleApplyBudgetTier = (tierKey: "budget" | "balanced" | "luxury") => {
-    const rate = economicProfile.dailyRates[tierKey]
-    const computedTotal = rate * days.length * travelers
+    const rate = economicProfile?.dailyRates?.[tierKey] || 0
+    const dCount = Math.max(1, days.length || 1)
+    const tCount = Math.max(1, travelers || 1)
+    const computedTotal = rate * dCount * tCount
     setBudget(String(computedTotal))
     toast({
       title: `Applied ${tierKey === "budget" ? "Explorer" : tierKey === "luxury" ? "Luxury" : "Balanced"} Tier`,
-      description: `${currency} ${rate.toLocaleString()}/day × ${days.length} Days × ${travelers} Travelers = ${currency} ${computedTotal.toLocaleString()} (${currency} ${Math.round(computedTotal / travelers).toLocaleString()} per member)`,
+      description: `${currency} ${rate.toLocaleString()}/day × ${dCount} Days × ${tCount} Travelers = ${currency} ${computedTotal.toLocaleString()} (${currency} ${Math.round(computedTotal / tCount).toLocaleString()} per member)`,
     })
   }
 
@@ -457,7 +459,7 @@ function ManualPlannerContent() {
     setEndDate(setup.endDate)
     setTravelers(setup.travelers)
     setCurrency(setup.currency)
-    setBudget(String(setup.targetBudget))
+    setBudget(String(setup.targetBudget || 0))
 
     // Build fresh days list matching exact calculated daysCount
     const newDays: ManualDay[] = []
@@ -482,8 +484,15 @@ function ManualPlannerContent() {
     setActiveDayNumber(1)
     toast({
       title: "✨ Expedition Architecture Created",
-      description: `${setup.daysCount} Days in ${setup.destination} initialized (${setup.currency} ${setup.targetBudget.toLocaleString()} budget).`,
+      description: `${setup.daysCount} Days in ${setup.destination} initialized (${setup.currency} ${(setup.targetBudget || 0).toLocaleString()} budget).`,
     })
+
+    // Automatically trigger budget discovery concierge strictly calibrated to new budget
+    if (setup.openDiscoveryOnStart !== false) {
+      setTimeout(() => {
+        setIsBudgetDiscoveryOpen(true)
+      }, 350)
+    }
   }
 
   // Destination Center Coordinates for Map & Routing
