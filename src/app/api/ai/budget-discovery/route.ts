@@ -25,6 +25,8 @@ export interface BudgetRecommendationItem {
   allOverNumeric: number
   pricingSource: string // e.g. "Official Ticket Desk" | "Local Trattoria Menu Average" | "Public Free Access"
   pricingInclusions: string // e.g. "Covers 2 adult tickets + museum audio guide"
+  websiteUrl?: string
+  mapsUrl?: string
   location: string
   bestTime: string
   duration: string
@@ -199,8 +201,11 @@ export async function POST(request: Request) {
           cost = String(Math.round(num))
           allOver = Math.round(allOver * mult)
         }
+        const loc = rec.location || destination
+        const title = `${rec.title} (${destination.split(",")[0]})`
         return {
           ...rec,
+          title,
           estimatedCost: cost,
           costPerPerson: cost,
           allOverPrice:
@@ -208,7 +213,8 @@ export async function POST(request: Request) {
               ? "Free • 0 Cost"
               : `~${symbol}${allOver.toLocaleString()} total for ${travelers} travelers`,
           allOverNumeric: allOver,
-          title: `${rec.title} (${destination.split(",")[0]})`,
+          websiteUrl: `https://www.google.com/search?q=${encodeURIComponent(title + " " + loc + " official website booking tickets")}`,
+          mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(title + " " + loc)}`,
         }
       })
 
@@ -256,6 +262,7 @@ Return ONLY raw valid JSON (no markdown fences, no formatting backticks, no expl
       "allOverNumeric": 50,
       "pricingSource": "e.g. Official Ticket Office | Verified Menu Average | Public Scenic Viewpoint | Standard Booking Rate",
       "pricingInclusions": "Exact breakdown of what this price covers (e.g. ${travelers} adult admissions + audio guide, or 3-course dinner + beverages + tip)",
+      "websiteUrl": "Official website URL or live booking portal link (e.g. https://...)",
       "location": "Specific street, neighborhood, or quarter in ${destination}",
       "bestTime": "e.g. 17:30 — 19:00 or 12:30 — 14:00 or Check-in 14:00",
       "duration": "e.g. 1.5h or 2h or Overnight",
@@ -326,9 +333,19 @@ Never invent fake prices; strictly output realistic internet-grounded amounts in
                   : r.allOverPrice ||
                     `~${symbol}${totalGroupNumeric.toLocaleString()} total for ${travelers} travelers`
 
+                const loc = r.location || destination
+                const title = r.title || "Curated Discovery"
+                const mapsQuery = encodeURIComponent(`${title} ${loc}`)
+                const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`
+                const webSearchQuery = encodeURIComponent(`${title} ${loc} official website booking tickets`)
+                const websiteUrl =
+                  r.websiteUrl && typeof r.websiteUrl === "string" && r.websiteUrl.startsWith("http")
+                    ? r.websiteUrl
+                    : `https://www.google.com/search?q=${webSearchQuery}`
+
                 return {
                   id: r.id || `rec-${Date.now()}-${idx}`,
-                  title: r.title || "Curated Discovery",
+                  title,
                   category: r.category || "Sunset Points",
                   estimatedCost: cleanCost,
                   costPerPerson: cleanPerPerson,
@@ -342,7 +359,9 @@ Never invent fake prices; strictly output realistic internet-grounded amounts in
                     (isFree
                       ? "Zero entry fee; public access"
                       : `Includes full experience for ${travelers} guests`),
-                  location: r.location || destination,
+                  websiteUrl,
+                  mapsUrl,
+                  location: loc,
                   bestTime: r.bestTime || "15:00",
                   duration: r.duration || "1.5h",
                   budgetFit:

@@ -26,6 +26,7 @@ import {
   ShieldCheck,
   Coins,
   CheckCircle2,
+  ExternalLink,
 } from "lucide-react"
 import { CurrencyCode, CURRENCY_SYMBOLS } from "@/lib/budget/budget-calculator"
 import { ActivityItem } from "@/components/trip/activity-card"
@@ -49,6 +50,8 @@ export interface BudgetRecommendationItem {
   allOverNumeric?: number
   pricingSource?: string // e.g. "Official Ticket Desk" | "Verified Menu Average"
   pricingInclusions?: string // e.g. "Covers 2 adult tickets + museum audio guide"
+  websiteUrl?: string
+  mapsUrl?: string
   location: string
   bestTime: string
   duration: string
@@ -627,6 +630,41 @@ function BudgetDiscoveryModalInner({
                               #{t}
                             </span>
                           ))}
+                      </div>
+
+                      {/* Real-Time Live Web & Google Maps Links */}
+                      <div className="flex items-center gap-2 pt-1 flex-wrap">
+                        <a
+                          href={
+                            item.websiteUrl ||
+                            `https://www.google.com/search?q=${encodeURIComponent(
+                              (item.title || "Attraction") + " " + (item.location || destination) + " official website booking tickets"
+                            )}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-sky-300 hover:text-white bg-sky-500/10 hover:bg-sky-500/20 border border-sky-500/25 transition-all cursor-pointer shadow-sm"
+                          title="Open official site or live booking portal"
+                        >
+                          <ExternalLink className="w-3 h-3 text-sky-400" />
+                          <span>Official Web & Booking</span>
+                        </a>
+
+                        <a
+                          href={
+                            item.mapsUrl ||
+                            `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                              (item.title || "Attraction") + " " + (item.location || destination)
+                            )}`
+                          }
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-medium text-emerald-300 hover:text-white bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/25 transition-all cursor-pointer shadow-sm"
+                          title="Open location on Google Maps for live directions, reviews, and satellite views"
+                        >
+                          <MapPin className="w-3 h-3 text-emerald-400" />
+                          <span>View on Maps</span>
+                        </a>
                       </div>
                     </div>
 

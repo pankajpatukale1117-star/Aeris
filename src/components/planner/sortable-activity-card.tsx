@@ -14,6 +14,7 @@ import {
   CalendarCheck,
   ArrowRightLeft,
   Navigation,
+  ExternalLink,
 } from "lucide-react"
 import { ActivityItem } from "@/components/trip/activity-card"
 import { TransitEstimate } from "@/lib/planner/route-optimizer"
@@ -232,7 +233,18 @@ export function SortableActivityCard({
           {activity.location && (
             <div className="flex items-center gap-1.5 text-xs text-[#94a3b8]">
               <MapPin className="w-3 h-3 text-[#38bdf8] shrink-0" />
-              <span className="truncate">{activity.location}</span>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  activity.title + " " + activity.location
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="truncate hover:text-[#38bdf8] hover:underline flex items-center gap-1 transition-colors cursor-pointer"
+                title="Open location on Google Maps"
+              >
+                <span>{activity.location}</span>
+                <ExternalLink className="w-2.5 h-2.5 opacity-60 inline" />
+              </a>
             </div>
           )}
 
