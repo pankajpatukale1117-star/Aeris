@@ -76,6 +76,7 @@ import {
   POPULAR_DESTINATIONS,
   DAILY_BUDGET_TIERS,
 } from "@/components/planner/trip-setup-modal"
+import { BudgetDiscoveryModal } from "@/components/planner/budget-discovery-modal"
 
 // Utilities & Hooks
 import { useToast } from "@/hooks/use-toast"
@@ -228,6 +229,9 @@ function ManualPlannerContent() {
 
   // First-Time Setup Wizard Modal State
   const [isSetupModalOpen, setIsSetupModalOpen] = React.useState(false)
+
+  // Real-time Budget Discovery Concierge Modal State
+  const [isBudgetDiscoveryOpen, setIsBudgetDiscoveryOpen] = React.useState(false)
 
   // Days and activities state (Clean - No Templates)
   const [days, setDays] = React.useState<ManualDay[]>(DEFAULT_DAYS)
@@ -946,6 +950,46 @@ function ManualPlannerContent() {
     })
   }
 
+  // Real-Time Budget Discovery Handlers
+  const handleAddDiscoveryToDay = (activity: ActivityItem, targetDayNumber: number) => {
+    setDays((prev) => {
+      if (prev.length === 0) {
+        return [
+          {
+            dayNumber: 1,
+            title: "Day 1: Arrival & Discovery",
+            activities: [activity],
+          },
+        ]
+      }
+      const dayExists = prev.some((d) => d.dayNumber === targetDayNumber)
+      if (!dayExists) {
+        return [
+          ...prev,
+          {
+            dayNumber: targetDayNumber,
+            title: `Day ${targetDayNumber}`,
+            activities: [activity],
+          },
+        ]
+      }
+      return prev.map((d) =>
+        d.dayNumber === targetDayNumber
+          ? { ...d, activities: [...d.activities, activity] }
+          : d
+      )
+    })
+
+    toast({
+      title: `Added to Day ${targetDayNumber}`,
+      description: `"${activity.title}" added to your itinerary.`,
+    })
+  }
+
+  const handleAddDiscoveryToBucketList = (staged: StagedItem) => {
+    handleAddStagedItem(staged)
+  }
+
   // Detailed Modal Activity Form Handlers
   const handleSaveActivity = (e: React.FormEvent) => {
     e.preventDefault()
@@ -1385,6 +1429,15 @@ function ManualPlannerContent() {
             >
               <PlusCircle className="w-3.5 h-3.5" />
               <span>{days.length === 0 ? "Plan a Trip" : "New Trip"}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsBudgetDiscoveryOpen(true)}
+              className="px-3 py-1.5 rounded-xl border border-amber-400/35 bg-amber-400/10 text-xs text-amber-300 hover:bg-amber-400/20 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+              title="Real-time budget analysis and smart spot recommendations: hotels, dining, sunset points & picnic spots"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              <span>Budget Discovery</span>
             </button>
             <button
               onClick={toggleBucketList}
@@ -2009,6 +2062,17 @@ function ManualPlannerContent() {
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Real-Time Budget Discovery */}
+            <button
+              type="button"
+              onClick={() => setIsBudgetDiscoveryOpen(true)}
+              className="glass-pill px-3 py-2 text-xs font-semibold text-amber-300 hover:text-white flex items-center gap-1.5 transition-all cursor-pointer border border-amber-400/25 bg-amber-400/5 hover:bg-amber-400/15"
+              title="Explore spots within budget: hotels, restaurants, sunset points & picnic spots"
+            >
+              <Compass className="w-3.5 h-3.5 text-amber-400" />
+              <span>Discover Spots</span>
+            </button>
+
             {/* AI Suggest Experience */}
             <button
               type="button"
@@ -2588,6 +2652,21 @@ function ManualPlannerContent() {
           </div>
         </div>
       )}
+
+      {/* ─── 11. REAL-TIME BUDGET DISCOVERY & SMART RECOMMENDATIONS ───────── */}
+      <BudgetDiscoveryModal
+        isOpen={isBudgetDiscoveryOpen}
+        onClose={() => setIsBudgetDiscoveryOpen(false)}
+        destination={destination || "Amalfi Coast, Italy"}
+        currency={currency}
+        totalBudget={numericTargetBudget || 2000}
+        daysCount={Math.max(1, days.length || 3)}
+        travelers={Math.max(1, travelers || 2)}
+        activeDayNumber={activeDay.dayNumber}
+        allDayNumbers={allDayNumbers}
+        onAddToDay={handleAddDiscoveryToDay}
+        onAddToBucketList={handleAddDiscoveryToBucketList}
+      />
     </div>
   )
 }
