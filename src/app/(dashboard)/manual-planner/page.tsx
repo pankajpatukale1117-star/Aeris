@@ -2585,7 +2585,7 @@ function ManualPlannerContent() {
         isOpen={isScratchpadOpen}
         onClose={() => setIsScratchpadOpen(false)}
         stagedItems={stagedItems}
-        activeDayNumber={activeDay.dayNumber}
+        activeDayNumber={activeDay?.dayNumber || 1}
         allDayNumbers={allDayNumbers}
         currencySymbol={currentCurrency.symbol}
         onAddItem={handleAddStagedItem}
@@ -2662,7 +2662,7 @@ function ManualPlannerContent() {
         totalBudget={numericTargetBudget || 2000}
         daysCount={Math.max(1, days.length || 3)}
         travelers={Math.max(1, travelers || 2)}
-        activeDayNumber={activeDay.dayNumber}
+        activeDayNumber={activeDay?.dayNumber || 1}
         allDayNumbers={allDayNumbers}
         onAddToDay={handleAddDiscoveryToDay}
         onAddToBucketList={handleAddDiscoveryToBucketList}

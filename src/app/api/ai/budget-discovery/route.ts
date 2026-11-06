@@ -138,9 +138,10 @@ export async function POST(request: Request) {
       perPersonTotal: Math.round((Number(totalBudget) || tripBudget.totalGroup) / (Number(travelers) || 1)),
       dailyPerPerson: Math.round((Number(totalBudget) || tripBudget.totalGroup) / ((Number(travelers) || 1) * (Number(daysCount) || 1))),
       targetAllocations: {
-        hotelPerNight: stayDaily * (Number(travelers) >= 2 ? 1.8 : 1), // room basis
-        diningPerPersonDaily: foodDaily,
-        entertainmentPerPersonDaily: expDaily,
+        hotelPerNight: Math.round(stayDaily * (Number(travelers) >= 2 ? 1.8 : 1)), // room basis
+        diningPerPersonDaily: Math.round(foodDaily),
+        entertainmentPerPersonDaily: Math.round(expDaily),
+        scenicAndBufferDaily: Math.max(10, Math.round(foodDaily * 0.35)),
         scenicAndSunsetBuffer: "Free or low-cost highlights",
       },
       regionLabel: econProfile.regionLabel,
@@ -285,3 +286,4 @@ Provide between 6 and 8 total recommendations covering all 5 categories. Never i
     )
   }
 }
+
