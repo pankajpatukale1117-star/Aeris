@@ -244,3 +244,4 @@ export const QUICK_STAMPS: QuickStamp[] = [
     defaultCost: "35",
   },
 ]
+

@@ -36,6 +36,9 @@ import {
   SlidersHorizontal,
   ListPlus,
   Download,
+  PlusCircle,
+  Users,
+  Compass,
 } from "lucide-react"
 
 // Drag and Drop (dnd-kit)
@@ -67,6 +70,12 @@ import { SortableActivityCard } from "@/components/planner/sortable-activity-car
 import { ScratchpadTray, StagedItem } from "@/components/planner/scratchpad-tray"
 import { PlannerMapPanel } from "@/components/planner/planner-map-panel"
 import { TripCalculator } from "@/components/trip/trip-calculator"
+import {
+  TripSetupModal,
+  TripSetupData,
+  POPULAR_DESTINATIONS,
+  DAILY_BUDGET_TIERS,
+} from "@/components/planner/trip-setup-modal"
 
 // Utilities & Hooks
 import { useToast } from "@/hooks/use-toast"
@@ -207,6 +216,41 @@ const DESTINATION_COORDS: Record<string, [number, number]> = {
 }
 
 // Safe date helpers using UTC
+function parseISODate(dateStr: string): Date | null {
+  if (!dateStr) return null
+  const [y, m, d] = dateStr.split("-").map(Number)
+  if (!y || !m || !d) return null
+  return new Date(Date.UTC(y, m - 1, d))
+}
+
+function formatISODate(d: Date): string {
+  const y = d.getUTCFullYear()
+  const m = String(d.getUTCMonth() + 1).padStart(2, "0")
+  const day = String(d.getUTCDate()).padStart(2, "0")
+  return `${y}-${m}-${day}`
+}
+
+function calculateDaysBetween(startDateStr: string, endDateStr: string): number {
+  const d1 = parseISODate(startDateStr)
+  const d2 = parseISODate(endDateStr)
+  if (!d1 || !d2) return 1
+  const diffMs = d2.getTime() - d1.getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24)) + 1
+  return Math.max(1, Math.min(30, diffDays))
+}
+
+function addDaysToDate(startDateStr: string, daysToAdd: number): string {
+  const d = parseISODate(startDateStr) || new Date()
+  d.setUTCDate(d.getUTCDate() + daysToAdd)
+  return formatISODate(d)
+}
+
+function getUpcomingDateString(daysFromNow: number): string {
+  const d = new Date()
+  d.setDate(d.getDate() + daysFromNow)
+  return d.toISOString().split("T")[0]
+}
+
 function formatDisplayDate(dateStr: string, offsetDays: number = 0): string {
   if (!dateStr) return ""
   try {
@@ -221,14 +265,7 @@ function formatDisplayDate(dateStr: string, offsetDays: number = 0): string {
 
 function calculateEndDate(dateStr: string, totalDays: number): string {
   if (!dateStr) return ""
-  try {
-    const [y, m, d] = dateStr.split("-").map(Number)
-    const dt = new Date(Date.UTC(y, m - 1, d))
-    dt.setUTCDate(dt.getUTCDate() + Math.max(0, totalDays - 1))
-    return dt.toISOString().split("T")[0]
-  } catch {
-    return dateStr
-  }
+  return addDaysToDate(dateStr, Math.max(0, totalDays - 1))
 }
 
 function ManualPlannerContent() {
@@ -238,14 +275,21 @@ function ManualPlannerContent() {
   const addTrip = useTravelStore((state) => state.addTrip)
 
   const prefillDestination = searchParams.get("destination") || "Amalfi Coast, Italy"
+  const defaultInitialStart = getUpcomingDateString(14)
+  const defaultInitialEnd = addDaysToDate(defaultInitialStart, 3)
 
   // Trip Master Header State
   const [tripTitle, setTripTitle] = React.useState("Custom Mediterranean Getaway")
   const [destination, setDestination] = React.useState(prefillDestination)
   const [startDate, setStartDate] = React.useState("2026-09-10")
+  const [endDate, setEndDate] = React.useState("2026-09-11")
+  const [travelers, setTravelers] = React.useState(2)
   const [budget, setBudget] = React.useState("3000")
   const [currency, setCurrency] = React.useState<CurrencyCode>("USD")
   const [notes, setNotes] = React.useState("Remember to book ferry between Positano and Capri.")
+
+  // First-Time Setup Wizard Modal State
+  const [isSetupModalOpen, setIsSetupModalOpen] = React.useState(false)
 
   // Days and activities state
   const [days, setDays] = React.useState<ManualDay[]>(DEFAULT_DAYS)
@@ -271,12 +315,20 @@ function ManualPlannerContent() {
         if (parsed.tripTitle) setTripTitle(parsed.tripTitle)
         if (parsed.destination) setDestination(parsed.destination)
         if (parsed.startDate) setStartDate(parsed.startDate)
+        if (parsed.endDate) setEndDate(parsed.endDate)
+        else if (parsed.startDate && parsed.days?.length) {
+          setEndDate(addDaysToDate(parsed.startDate, parsed.days.length - 1))
+        }
+        if (parsed.travelers) setTravelers(parsed.travelers)
         if (parsed.budget) setBudget(parsed.budget)
         if (parsed.currency) setCurrency(parsed.currency)
         if (parsed.notes) setNotes(parsed.notes)
         if (parsed.days && Array.isArray(parsed.days) && parsed.days.length > 0) {
           setDays(parsed.days)
         }
+      } else {
+        // If visiting fresh with no saved draft, automatically launch the trip genesis wizard
+        setIsSetupModalOpen(true)
       }
 
       const savedStaged = localStorage.getItem(SCRATCHPAD_KEY)
@@ -293,6 +345,13 @@ function ManualPlannerContent() {
     }
   }, [])
 
+  // Check query params for forced new trip trigger
+  React.useEffect(() => {
+    if (searchParams.get("new") === "true") {
+      setIsSetupModalOpen(true)
+    }
+  }, [searchParams])
+
   // Auto-save draft changes
   React.useEffect(() => {
     if (!isLoadedFromStorage) return
@@ -302,6 +361,9 @@ function ManualPlannerContent() {
           tripTitle,
           destination,
           startDate,
+          endDate,
+          daysCount: days.length,
+          travelers,
           budget,
           currency,
           notes,
@@ -316,7 +378,7 @@ function ManualPlannerContent() {
       }
     }, 500)
     return () => clearTimeout(timeout)
-  }, [tripTitle, destination, startDate, budget, currency, notes, days, stagedItems, isLoadedFromStorage])
+  }, [tripTitle, destination, startDate, endDate, travelers, budget, currency, notes, days, stagedItems, isLoadedFromStorage])
 
   const handleResetTemplate = () => {
     try {
@@ -324,9 +386,11 @@ function ManualPlannerContent() {
       localStorage.removeItem(SCRATCHPAD_KEY)
     } catch {}
     setTripTitle("Custom Mediterranean Getaway")
-    setDestination(prefillDestination || "Amalfi Coast, Italy")
+    setDestination("Amalfi Coast, Italy")
     setStartDate("2026-09-10")
+    setEndDate("2026-09-11")
     setBudget("3000")
+    setTravelers(2)
     setCurrency("USD")
     setNotes("Remember to book ferry between Positano and Capri.")
     setDays(DEFAULT_DAYS)
@@ -341,10 +405,122 @@ function ManualPlannerContent() {
   // Active Currency Config
   const currentCurrency = CURRENCIES.find((c) => c.code === currency) || CURRENCIES[0]
 
-  // Calculated End Date
+  // Calculated End Date (uses explicit endDate state or fallbacks)
   const computedEndDate = React.useMemo(() => {
-    return calculateEndDate(startDate, days.length)
-  }, [startDate, days.length])
+    return endDate || calculateEndDate(startDate, days.length)
+  }, [endDate, startDate, days.length])
+
+  // Helper to dynamically resize the days array matching target count
+  const adjustDaysLength = (targetCount: number, startStr: string = startDate) => {
+    if (targetCount === days.length || targetCount < 1) return
+
+    setDays((prev) => {
+      if (targetCount > prev.length) {
+        const updated = [...prev]
+        const destShort = destination.split(",")[0]?.trim() || "Sanctuary"
+        for (let i = prev.length + 1; i <= targetCount; i++) {
+          const dayDate = formatDisplayDate(startStr, i - 1)
+          const isLast = i === targetCount
+          updated.push({
+            dayNumber: i,
+            title: isLast ? `Departure & Farewell ${destShort}` : `Day ${i}: Exploring ${destShort}${dayDate ? ` • ${dayDate}` : ""}`,
+            activities: [],
+          })
+        }
+        return updated
+      } else {
+        return prev.slice(0, targetCount)
+      }
+    })
+
+    setActiveDayNumber((prev) => Math.min(prev, targetCount))
+  }
+
+  // When user edits Start Date in Trip Details
+  const handleStartDateChange = (newStart: string) => {
+    setStartDate(newStart)
+    if (newStart > endDate) {
+      const nextEnd = addDaysToDate(newStart, Math.max(0, days.length - 1))
+      setEndDate(nextEnd)
+    } else {
+      const newDaysCount = calculateDaysBetween(newStart, endDate)
+      adjustDaysLength(newDaysCount, newStart)
+    }
+  }
+
+  // When user edits End Date in Trip Details
+  const handleEndDateChange = (newEnd: string) => {
+    if (newEnd < startDate) {
+      setStartDate(newEnd)
+      setEndDate(addDaysToDate(newEnd, Math.max(1, days.length - 1)))
+      return
+    }
+    setEndDate(newEnd)
+    const newDaysCount = calculateDaysBetween(startDate, newEnd)
+    adjustDaysLength(newDaysCount, startDate)
+  }
+
+  // Stepper to adjust days count
+  const handleStepperDays = (delta: number) => {
+    const nextDaysCount = Math.max(1, Math.min(30, days.length + delta))
+    if (nextDaysCount === days.length) return
+    const nextEndDate = addDaysToDate(startDate, nextDaysCount - 1)
+    setEndDate(nextEndDate)
+    adjustDaysLength(nextDaysCount, startDate)
+    toast({
+      title: delta > 0 ? `Day ${nextDaysCount} Added` : `Day Removed`,
+      description: `Timeline adjusted to ${nextDaysCount} Days (${formatDisplayDate(startDate)} — ${formatDisplayDate(nextEndDate)}).`,
+    })
+  }
+
+  // 1-Click Budget Recalculator based on travel style
+  const handleApplyBudgetTier = (tierKey: "budget" | "balanced" | "luxury") => {
+    const tierConfig = DAILY_BUDGET_TIERS[currency] || DAILY_BUDGET_TIERS.USD
+    const rate = tierConfig[tierKey]
+    const computedTotal = rate * days.length * travelers
+    setBudget(String(computedTotal))
+    toast({
+      title: `Applied ${tierKey === "budget" ? "Explorer" : tierKey === "luxury" ? "Luxury" : "Balanced"} Budget`,
+      description: `${currency} ${rate.toLocaleString()}/day × ${days.length} Days × ${travelers} Travelers = ${currency} ${computedTotal.toLocaleString()}`,
+    })
+  }
+
+  // Handle Trip Setup Modal Application (Location -> Dates -> Days -> Budget)
+  const handleApplyTripSetup = (setup: TripSetupData) => {
+    setDestination(setup.destination)
+    setTripTitle(setup.tripTitle)
+    setStartDate(setup.startDate)
+    setEndDate(setup.endDate)
+    setTravelers(setup.travelers)
+    setCurrency(setup.currency)
+    setBudget(String(setup.targetBudget))
+
+    // Build fresh days list matching exact calculated daysCount
+    const newDays: ManualDay[] = []
+    const destShort = setup.destination.split(",")[0]?.trim() || "Sanctuary"
+    for (let i = 1; i <= setup.daysCount; i++) {
+      const dayDate = formatDisplayDate(setup.startDate, i - 1)
+      let dayTitle = `Day ${i}: Exploring ${destShort}`
+      if (i === 1) {
+        dayTitle = `Day 1: Arrival & ${destShort} Check-in`
+      } else if (i === setup.daysCount && setup.daysCount > 1) {
+        dayTitle = `Day ${setup.daysCount}: Departure & Farewell ${destShort}`
+      }
+
+      newDays.push({
+        dayNumber: i,
+        title: `${dayTitle}${dayDate ? ` • ${dayDate}` : ""}`,
+        activities: [],
+      })
+    }
+
+    setDays(newDays)
+    setActiveDayNumber(1)
+    toast({
+      title: "✨ Expedition Architecture Created",
+      description: `${setup.daysCount} Days in ${setup.destination} initialized (${setup.currency} ${setup.targetBudget.toLocaleString()} budget).`,
+    })
+  }
 
   // Destination Center Coordinates for Map & Routing
   const destinationCenter: [number, number] = React.useMemo(() => {
@@ -536,18 +712,20 @@ function ManualPlannerContent() {
   const handleAddDay = () => {
     const nextDayNum = days.length + 1
     const nextDayDate = formatDisplayDate(startDate, nextDayNum - 1)
+    const destShort = destination.split(",")[0]?.trim() || "Sanctuary"
     setDays((prev) => [
       ...prev,
       {
         dayNumber: nextDayNum,
-        title: `Day ${nextDayNum}${nextDayDate ? ` (${nextDayDate})` : ""} Itinerary`,
+        title: `Day ${nextDayNum}: Exploring ${destShort}${nextDayDate ? ` (${nextDayDate})` : ""}`,
         activities: [],
       },
     ])
     setActiveDayNumber(nextDayNum)
+    setEndDate(addDaysToDate(startDate, nextDayNum - 1))
     toast({
       title: `Day ${nextDayNum} Added`,
-      description: "You can now add custom activities for this day.",
+      description: "Added custom day and extended itinerary end date.",
     })
   }
 
@@ -569,6 +747,9 @@ function ManualPlannerContent() {
       }))
     })
 
+    const newTotal = days.length - 1
+    setEndDate(addDaysToDate(startDate, Math.max(0, newTotal - 1)))
+
     setActiveDayNumber((prev) => {
       if (prev === dayNum) return Math.max(1, dayNum - 1)
       if (prev > dayNum) return prev - 1
@@ -577,7 +758,7 @@ function ManualPlannerContent() {
 
     toast({
       title: "Day Removed",
-      description: `Day ${dayNum} deleted and remaining days re-indexed.`,
+      description: `Day ${dayNum} deleted and end date adjusted.`,
     })
   }
 
@@ -1063,7 +1244,7 @@ function ManualPlannerContent() {
       startDate: startDate,
       endDate: computedEndDate,
       daysCount: days.length,
-      travelers: 2,
+      travelers: travelers || 2,
       budget: budget ? formatCurrency(numericTargetBudget, currency) : undefined,
       status: "planning",
       planningMode: "Manual Studio",
@@ -1152,6 +1333,11 @@ function ManualPlannerContent() {
                 <Calendar className="w-3.5 h-3.5 text-sky-400 shrink-0" />
                 {dateRangeText || "Sep 10 — Sep 11 (2 Days)"}
               </span>
+              <span className="text-slate-600">•</span>
+              <span className="flex items-center gap-1 text-slate-300">
+                <Users className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                {travelers} {travelers === 1 ? "Traveler" : "Travelers"}
+              </span>
             </div>
           </div>
 
@@ -1203,6 +1389,15 @@ function ManualPlannerContent() {
           {/* Utility Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
             <button
+              type="button"
+              onClick={() => setIsSetupModalOpen(true)}
+              className="px-3 py-1.5 rounded-xl border border-[#38bdf8]/35 bg-[#38bdf8]/10 text-xs text-[#38bdf8] hover:bg-[#38bdf8]/20 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
+              title="Plan new trip: enter location, dates, days & budget"
+            >
+              <PlusCircle className="w-3.5 h-3.5" />
+              <span>New Trip</span>
+            </button>
+            <button
               onClick={toggleBucketList}
               className="px-3 py-1.5 rounded-xl border border-white/15 text-xs text-slate-300 hover:bg-white/10 hover:text-white transition-colors flex items-center gap-1.5 cursor-pointer"
             >
@@ -1235,65 +1430,162 @@ function ManualPlannerContent() {
         </div>
       </div>
 
-      {/* ─── 2. COLLAPSIBLE TRIP DETAILS ─────────────────────────────────── */}
+      {/* ─── 2. COLLAPSIBLE TRIP DETAILS & ARCHITECTURE DRAWER ───────────── */}
       {isSettingsOpen && (
-        <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-4 animate-reveal bg-[#050a10]/80">
-          <div className="flex items-center justify-between border-b border-white/10 pb-3">
-            <span className="editorial-tag text-[#e8d5b5] flex items-center gap-1.5">
-              <Sliders className="w-3.5 h-3.5 text-[#38bdf8]" />
-              Trip Configuration & Parameters
-            </span>
-            <div className="flex items-center gap-3">
+        <div className="glass-shell p-6 rounded-3xl border border-white/20 shadow-2xl space-y-5 animate-reveal bg-[#050a10]/85">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-white/10 pb-3 flex-wrap gap-2">
+            <div className="flex items-center gap-2">
+              <span className="editorial-tag text-[#e8d5b5] flex items-center gap-1.5 text-xs">
+                <Sliders className="w-3.5 h-3.5 text-[#38bdf8]" />
+                Trip Architecture & Parameters
+              </span>
+              <span className="text-[10px] text-slate-400 font-mono glass-pill px-2 py-0.5 rounded-full border border-white/10">
+                Location → Dates → Days → Budget
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setIsSetupModalOpen(true)}
+                className="text-xs text-[#38bdf8] hover:text-white glass-pill px-3 py-1 rounded-full border border-[#38bdf8]/30 bg-[#38bdf8]/10 flex items-center gap-1 cursor-pointer transition-all"
+                title="Open 4-step Trip Genesis Wizard"
+              >
+                <Compass className="w-3 h-3" />
+                <span>Launch Wizard</span>
+              </button>
               <button
                 type="button"
                 onClick={handleResetTemplate}
-                className="text-xs text-rose-400/80 hover:text-rose-300 flex items-center gap-1 cursor-pointer"
+                className="text-xs text-rose-400/80 hover:text-rose-300 flex items-center gap-1 cursor-pointer px-2 py-1"
                 title="Reset to default template"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>Reset Template</span>
+                <span>Reset</span>
               </button>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="text-xs text-slate-300 hover:text-white glass-pill px-3 py-1 rounded-full cursor-pointer"
+                className="text-xs text-slate-200 hover:text-white glass-pill px-3 py-1 rounded-full cursor-pointer bg-white/10"
               >
                 Done ✓
               </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
-            <div className="space-y-1">
-              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Trip Title</label>
-              <input
-                value={tripTitle}
-                onChange={(e) => setTripTitle(e.target.value)}
-                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                placeholder="e.g. Kyoto Zen Retreat"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Destination</label>
+          {/* Core Configuration 3-Column Architecture Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
+            {/* 1. LOCATION & POPULAR SANCTUARIES */}
+            <div className="space-y-2 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-rose-400" />
+                  1. Destination
+                </label>
+                <span className="text-[10px] text-slate-400">Where to?</span>
+              </div>
               <input
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
                 className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
-                placeholder="e.g. Amalfi Coast, Italy"
+                placeholder="e.g. Kyoto, Japan or Amalfi Coast"
               />
+              {/* Quick Destination Chips */}
+              <div className="pt-1 space-y-1">
+                <span className="text-[9px] text-slate-400 uppercase tracking-widest font-mono">Popular Sanctuaries:</span>
+                <div className="flex flex-wrap gap-1">
+                  {POPULAR_DESTINATIONS.slice(0, 6).map((dest) => (
+                    <button
+                      key={dest.name}
+                      type="button"
+                      onClick={() => {
+                        setDestination(dest.name)
+                        if (!tripTitle || tripTitle.includes("Mediterranean") || tripTitle.includes("Journey to")) {
+                          setTripTitle(`Expedition to ${dest.name.split(",")[0]}`)
+                        }
+                      }}
+                      className={`text-[10px] px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
+                        destination.toLowerCase().includes(dest.name.split(",")[0].toLowerCase())
+                          ? "bg-[#e8d5b5]/20 text-[#e8d5b5] border-[#e8d5b5]/40 font-semibold"
+                          : "bg-white/5 text-slate-300 border-white/10 hover:border-white/20"
+                      }`}
+                    >
+                      {dest.icon} {dest.name.split(",")[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">Start Date</label>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white cursor-pointer"
-              />
-            </div>
-            <div className="space-y-1">
+
+            {/* 2. DATES & AUTOMATIC DURATION CALCULATION */}
+            <div className="space-y-2 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
               <div className="flex items-center justify-between">
-                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
-                  Budget ({currentCurrency.symbol})
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
+                  <Calendar className="w-3 h-3 text-sky-400" />
+                  2. Dates & Duration
+                </label>
+                <span className="text-[10px] text-emerald-400 font-mono font-semibold">
+                  {days.length} Days ({Math.max(1, days.length - 1)} Nights)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[9px] text-slate-400 block mb-1">Start Date</span>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => handleStartDateChange(e.target.value)}
+                    className="w-full glass-input rounded-xl h-8 px-2 text-xs text-white cursor-pointer"
+                  />
+                </div>
+                <div>
+                  <span className="text-[9px] text-slate-400 block mb-1">End Date</span>
+                  <input
+                    type="date"
+                    value={endDate}
+                    min={startDate}
+                    onChange={(e) => handleEndDateChange(e.target.value)}
+                    className="w-full glass-input rounded-xl h-8 px-2 text-xs text-white cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Days Stepper Counter */}
+              <div className="pt-1 flex items-center justify-between glass-pill px-3 py-1.5 rounded-xl border border-white/10 bg-black/30">
+                <span className="text-[10px] text-slate-300 font-medium">Itinerary Days:</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleStepperDays(-1)}
+                    disabled={days.length <= 1}
+                    className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-all"
+                    title="Remove a day"
+                  >
+                    -
+                  </button>
+                  <span className="font-mono text-xs font-bold text-white min-w-[2.5rem] text-center">
+                    {days.length}d
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleStepperDays(1)}
+                    disabled={days.length >= 30}
+                    className="w-6 h-6 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-all"
+                    title="Add a day"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* 3. PARTY SIZE & DYNAMIC BUDGET ARCHITECTURE */}
+            <div className="space-y-2 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
+                  <DollarSign className="w-3 h-3 text-emerald-400" />
+                  3. Party & Target Budget
                 </label>
                 <button
                   type="button"
@@ -1304,28 +1596,105 @@ function ManualPlannerContent() {
                   <span>Calc</span>
                 </button>
               </div>
-              <input
-                type="number"
-                value={budget}
-                onChange={(e) => setBudget(e.target.value)}
-                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white font-mono"
-                placeholder="3000"
-              />
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <span className="text-[9px] text-slate-400 block mb-1">Travelers</span>
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 4].map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setTravelers(num)}
+                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-mono border transition-all cursor-pointer ${
+                          travelers === num
+                            ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 font-bold"
+                            : "bg-white/5 text-slate-400 border-white/10 hover:text-white"
+                        }`}
+                      >
+                        {num}p
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-[9px] text-slate-400 block mb-1">Budget ({currentCurrency.symbol})</span>
+                  <input
+                    type="number"
+                    value={budget}
+                    onChange={(e) => setBudget(e.target.value)}
+                    className="w-full glass-input rounded-xl h-8 px-2 text-xs text-white font-mono"
+                    placeholder="3000"
+                  />
+                </div>
+              </div>
+
+              {/* 1-Click Budget Architecture Recalculators */}
+              <div className="pt-1 space-y-1">
+                <div className="flex items-center justify-between text-[9px] text-slate-400">
+                  <span className="uppercase tracking-widest font-mono">1-Click Tier Recalc:</span>
+                  <span className="font-mono text-[#e8d5b5]">
+                    {currentCurrency.symbol}
+                    {Math.round(numericTargetBudget / Math.max(1, days.length))}/day
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleApplyBudgetTier("budget")}
+                    className="px-1.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] text-slate-300 hover:text-white cursor-pointer transition-all text-center"
+                    title="Explorer tier (~$90/day/person)"
+                  >
+                    Explorer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyBudgetTier("balanced")}
+                    className="px-1.5 py-1 rounded-lg bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 border border-[#38bdf8]/30 text-[9px] text-[#38bdf8] font-semibold cursor-pointer transition-all text-center"
+                    title="Balanced tier (~$250/day/person)"
+                  >
+                    Balanced ★
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleApplyBudgetTier("luxury")}
+                    className="px-1.5 py-1 rounded-lg bg-[#e8d5b5]/10 hover:bg-[#e8d5b5]/20 border border-[#e8d5b5]/30 text-[9px] text-[#e8d5b5] cursor-pointer transition-all text-center"
+                    title="Luxury tier (~$650/day/person)"
+                  >
+                    Luxury
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="space-y-1 pt-1">
-            <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
-              <FileText className="w-3 h-3 text-[#38bdf8]" />
-              Trip Notes & Reservations
-            </label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Record hotel reservations, packing reminders, flight codes..."
-              rows={2}
-              className="w-full glass-input rounded-xl p-3 text-xs text-white"
-            />
+          {/* Secondary Details: Trip Title & Notes */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-white/10 text-xs">
+            <div className="sm:col-span-1 space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold">
+                Trip Dossier Title
+              </label>
+              <input
+                value={tripTitle}
+                onChange={(e) => setTripTitle(e.target.value)}
+                className="w-full glass-input rounded-xl h-9 px-3 text-xs text-white"
+                placeholder="e.g. Kyoto Zen Retreat"
+              />
+            </div>
+            <div className="sm:col-span-2 space-y-1">
+              <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
+                <FileText className="w-3 h-3 text-[#38bdf8]" />
+                Personal Notes, Flights & Reservations
+              </label>
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Record hotel reservations, packing reminders, flight codes..."
+                rows={1}
+                className="w-full glass-input rounded-xl px-3 py-2 text-xs text-white"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -2049,6 +2418,19 @@ function ManualPlannerContent() {
         daysCount={days.length}
         onApplyCost={handleApplyCostFromCalc}
         onApplyTargetBudget={handleApplyTargetBudgetFromCalc}
+      />
+
+      {/* ─── 9. EXPEDITION SETUP & ARCHITECTURE MODAL (Location -> Dates -> Days -> Budget) ─── */}
+      <TripSetupModal
+        isOpen={isSetupModalOpen}
+        onClose={() => setIsSetupModalOpen(false)}
+        currentDestination={destination}
+        currentStartDate={startDate}
+        currentEndDate={endDate}
+        currentCurrency={currency}
+        currentTravelers={travelers}
+        currentBudget={numericTargetBudget}
+        onApplySetup={handleApplyTripSetup}
       />
     </div>
   )
