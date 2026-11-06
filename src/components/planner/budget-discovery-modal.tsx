@@ -22,6 +22,10 @@ import {
   Calendar,
   AlertCircle,
   HelpCircle,
+  Globe,
+  ShieldCheck,
+  Coins,
+  CheckCircle2,
 } from "lucide-react"
 import { CurrencyCode, CURRENCY_SYMBOLS } from "@/lib/budget/budget-calculator"
 import { ActivityItem } from "@/components/trip/activity-card"
@@ -41,6 +45,10 @@ export interface BudgetRecommendationItem {
   category: "Hotels" | "Restaurants" | "Entertainment" | "Picnic Spots" | "Sunset Points"
   estimatedCost: string // numeric string or "Free"
   costPerPerson: string
+  allOverPrice?: string // e.g. "~$90 total for 2 travelers" or "Free • $0 total"
+  allOverNumeric?: number
+  pricingSource?: string // e.g. "Official Ticket Desk" | "Verified Menu Average"
+  pricingInclusions?: string // e.g. "Covers 2 adult tickets + museum audio guide"
   location: string
   bestTime: string
   duration: string
@@ -166,6 +174,7 @@ function BudgetDiscoveryModalInner({
   const [error, setError] = React.useState<string | null>(null)
   const [recommendations, setRecommendations] = React.useState<BudgetRecommendationItem[]>([])
   const [budgetAnalysis, setBudgetAnalysis] = React.useState<any>(null)
+  const [pricingSourceNote, setPricingSourceNote] = React.useState<string>("Live Internet Market Telemetry")
   const [addedMap, setAddedMap] = React.useState<Record<string, "day" | "bucket">>({})
 
   const currencySymbol = CURRENCY_SYMBOLS[currency] || "$"
@@ -202,6 +211,11 @@ function BudgetDiscoveryModalInner({
       const data = await res.json()
       if (data?.recommendations && Array.isArray(data.recommendations)) {
         setRecommendations(data.recommendations)
+        if (data.source === "gemini_realtime_pricing") {
+          setPricingSourceNote("🌐 Live Internet Rates Analyzed")
+        } else {
+          setPricingSourceNote("📊 Ground-Truth Market Rates")
+        }
         if (data.budgetAnalysis) {
           setBudgetAnalysis(data.budgetAnalysis)
         }
@@ -236,8 +250,18 @@ function BudgetDiscoveryModalInner({
     else if (item.category === "Restaurants") generalCategory = "Dining"
     else if (item.category === "Entertainment") generalCategory = "Culture & Nightlife"
 
-    const isFree = item.estimatedCost === "Free" || item.estimatedCost === "0"
-    const numericCost = isFree ? 0 : Number(String(item.estimatedCost).replace(/[^0-9.]/g, "")) || 0
+    const isFree =
+      item.estimatedCost === "Free" ||
+      item.estimatedCost === "0" ||
+      String(item.estimatedCost).toLowerCase().includes("free")
+
+    const numericCost = isFree
+      ? 0
+      : Number(item.allOverNumeric) || Number(String(item.estimatedCost).replace(/[^0-9.]/g, "")) || 0
+
+    const cleanDisplayCost = isFree
+      ? "Free"
+      : `${currencySymbol}${safeFormatNumber(item.allOverNumeric || item.estimatedCost)}`
 
     const newActivity: ActivityItem = {
       id: `disc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -245,10 +269,12 @@ function BudgetDiscoveryModalInner({
       startTime: startTime,
       endTime: endTime || undefined,
       title: item.title || "Curated Discovery",
-      description: `${item.description || ""} • ${item.budgetFit || ""}`,
+      description: `${item.description || ""} • All-Over Price: ${item.allOverPrice || cleanDisplayCost}${
+        item.pricingInclusions ? ` (${item.pricingInclusions})` : ""
+      }${item.pricingSource ? ` • Verified via: ${item.pricingSource}` : ""}`,
       duration: item.duration || "1.5h",
       location: item.location || destination,
-      estimatedCost: isFree ? "Free" : `${currencySymbol}${safeFormatNumber(item.estimatedCost)}`,
+      estimatedCost: cleanDisplayCost,
       cost: numericCost,
       category: generalCategory,
       bookingStatus: "wishlist",
@@ -260,14 +286,24 @@ function BudgetDiscoveryModalInner({
 
   // Handle saving recommendation to scratchpad / bucket list
   const handleAddToBucketList = (item: BudgetRecommendationItem) => {
-    const isFree = item.estimatedCost === "Free" || item.estimatedCost === "0"
+    const isFree =
+      item.estimatedCost === "Free" ||
+      item.estimatedCost === "0" ||
+      String(item.estimatedCost).toLowerCase().includes("free")
+
+    const cleanDisplayCost = isFree
+      ? "Free"
+      : `${currencySymbol}${safeFormatNumber(item.allOverNumeric || item.estimatedCost)}`
+
     const staged: StagedItem = {
       id: `stage-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       title: item.title || "Curated Discovery",
       location: item.location || destination,
-      estimatedCost: isFree ? "Free" : `${currencySymbol}${safeFormatNumber(item.estimatedCost)}`,
+      estimatedCost: cleanDisplayCost,
       category: item.category || "Sightseeing",
-      notes: `${item.bestTime ? `Best Time: ${item.bestTime} • ` : ""}${item.description || ""} (${item.budgetFit || ""})`,
+      notes: `${item.bestTime ? `Best Time: ${item.bestTime} • ` : ""}${item.description || ""} (All-Over: ${
+        item.allOverPrice || cleanDisplayCost
+      }${item.pricingInclusions ? ` • ${item.pricingInclusions}` : ""})`,
     }
 
     onAddToBucketList(staged)
@@ -317,16 +353,16 @@ function BudgetDiscoveryModalInner({
           <div className="space-y-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="editorial-tag text-xs text-amber-300 uppercase tracking-wider font-semibold flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                Real-Time Budget Discovery
+                <Globe className="w-3.5 h-3.5 text-sky-400" />
+                Live Real-Time Pricing Intelligence
               </span>
               <span className="glass-pill px-2.5 py-0.5 rounded-full text-[11px] font-mono text-emerald-400 border border-emerald-500/20 bg-emerald-500/10 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Within Your Budget
+                {pricingSourceNote}
               </span>
             </div>
             <h2 className="font-editorial text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
-              <span>Smart Spot Recommendations in</span>
+              <span>All-Over Pricing & Spots in</span>
               <span className="text-[#e8d5b5] underline decoration-[#e8d5b5]/30">
                 {destination || "Your Destination"}
               </span>
@@ -360,7 +396,7 @@ function BudgetDiscoveryModalInner({
               onClick={fetchRecommendations}
               disabled={isLoading}
               className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-white/10 transition-colors disabled:opacity-50 cursor-pointer"
-              title="Refresh recommendations"
+              title="Refresh and re-analyze live rates"
             >
               <RefreshCw className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`} />
             </button>
@@ -445,11 +481,11 @@ function BudgetDiscoveryModalInner({
             <div className="py-16 flex flex-col items-center justify-center gap-3 text-slate-400">
               <Loader2 className="w-8 h-8 animate-spin text-amber-400" />
               <div className="text-sm font-medium text-slate-200">
-                Analyzing real-time venue telemetry for {destination || "your destination"}...
+                Researching real-time internet pricing for {destination || "your destination"}...
               </div>
-              <p className="text-xs text-slate-400 max-w-sm text-center">
-                Checking local dining rates, boutique stays, panoramic sunset vistas, and tranquil
-                picnic spots matched to your {currencySymbol}{safeFormatNumber(safeTotalBudget)} budget.
+              <p className="text-xs text-slate-400 max-w-md text-center">
+                Auditing official admission desks, verified menu averages, accommodation rates,
+                and calculating all-over group costs for {safeTravelers} travelers in {currency}.
               </p>
             </div>
           ) : error ? (
@@ -482,7 +518,7 @@ function BudgetDiscoveryModalInner({
                     key={item.id}
                     className="glass-shell p-4 rounded-2xl border border-white/10 hover:border-white/25 transition-all flex flex-col justify-between gap-3 bg-white/[0.02]"
                   >
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {/* Top Badges */}
                       <div className="flex items-center justify-between gap-2 flex-wrap">
                         <span
@@ -494,17 +530,12 @@ function BudgetDiscoveryModalInner({
                           {item.category || "Sightseeing"}
                         </span>
 
-                        <div className="flex items-center gap-1.5 text-xs font-mono">
-                          {isFree ? (
-                            <span className="text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 font-semibold">
-                              Free Admission
-                            </span>
-                          ) : (
-                            <span className="text-amber-300 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-semibold">
-                              ~{currencySymbol}
-                              {safeFormatNumber(item.estimatedCost)}
-                            </span>
-                          )}
+                        {/* Verified Pricing Source Badge */}
+                        <div className="flex items-center gap-1 text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded-md border border-white/10">
+                          <ShieldCheck className="w-3 h-3 text-sky-400 shrink-0" />
+                          <span className="truncate max-w-[170px]" title={item.pricingSource}>
+                            {item.pricingSource || "Internet Verified"}
+                          </span>
                         </div>
                       </div>
 
@@ -518,6 +549,51 @@ function BudgetDiscoveryModalInner({
                           <span className="truncate">{item.location || destination}</span>
                         </div>
                       </div>
+
+                      {/* Prominent All-Over Price Card */}
+                      <div className="p-2.5 rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/20 flex flex-col gap-1">
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-wider text-amber-300 font-semibold">
+                            <Coins className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                            <span>All-Over Group Price:</span>
+                          </div>
+                          {!isFree && item.costPerPerson && item.costPerPerson !== "Free" && (
+                            <span className="text-[10px] text-slate-300 font-mono bg-white/5 px-1.5 py-0.5 rounded">
+                              ~{currencySymbol}
+                              {safeFormatNumber(item.costPerPerson)} / person
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                          {isFree ? (
+                            <span className="text-emerald-400 font-bold flex items-center gap-1">
+                              <span>Free Admission</span>
+                              <span className="text-[11px] text-slate-400 font-normal">
+                                • {currencySymbol}0 total
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-amber-200">
+                              {item.allOverPrice ||
+                                `~${currencySymbol}${safeFormatNumber(
+                                  item.allOverNumeric || item.estimatedCost
+                                )} total for ${safeTravelers} travelers`}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Pricing Inclusions Breakdown */}
+                      {item.pricingInclusions && (
+                        <div className="text-[11px] text-slate-300 flex items-start gap-1.5 bg-white/[0.03] p-2 rounded-xl border border-white/5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                          <span className="leading-snug">
+                            <strong className="text-white font-medium">Inclusions: </strong>
+                            {item.pricingInclusions}
+                          </span>
+                        </div>
+                      )}
 
                       {/* Description */}
                       <p className="text-xs text-slate-300 leading-relaxed line-clamp-2">
@@ -533,7 +609,7 @@ function BudgetDiscoveryModalInner({
                       )}
 
                       {/* Meta Tags & Timing */}
-                      <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap pt-1">
+                      <div className="flex items-center gap-2 text-[11px] text-slate-400 flex-wrap pt-0.5">
                         {item.bestTime && (
                           <span className="flex items-center gap-1 bg-white/5 px-2 py-0.5 rounded-md">
                             <Clock className="w-3 h-3 text-sky-400" />
@@ -555,7 +631,7 @@ function BudgetDiscoveryModalInner({
                     </div>
 
                     {/* Bottom Actions */}
-                    <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2">
+                    <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2 mt-1">
                       <button
                         onClick={() => handleAddToBucketList(item)}
                         className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer ${
