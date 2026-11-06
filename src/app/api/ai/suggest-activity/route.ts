@@ -59,7 +59,12 @@ export async function POST(request: Request) {
     const apiKey = process.env.GEMINI_API_KEY
 
     if (!apiKey || apiKey === "your_gemini_api_key" || apiKey.includes("placeholder")) {
-      const pick = FALLBACK_SUGGESTIONS[Math.floor(Math.random() * FALLBACK_SUGGESTIONS.length)]
+      const pick = { ...FALLBACK_SUGGESTIONS[Math.floor(Math.random() * FALLBACK_SUGGESTIONS.length)] }
+      if (currency === "INR" && pick.estimatedCost !== "Free") {
+        pick.estimatedCost = String(Number(pick.estimatedCost) * 20)
+      } else if (currency === "JPY" && pick.estimatedCost !== "Free") {
+        pick.estimatedCost = String(Number(pick.estimatedCost) * 120)
+      }
       return NextResponse.json({ activity: pick, source: "curated_fallback" })
     }
 
@@ -69,8 +74,11 @@ export async function POST(request: Request) {
 Target Destination: "${destination || "Amalfi Coast, Italy"}"
 Day Theme: "${dayTitle || "Exploration & Leisure"}"
 Current Day Schedule: ${currentTimes || "No stops yet"}
+Active Currency: ${currency}
 
 Suggest ONE authentic, exquisite, non-generic travel activity for this day that fits into the itinerary naturally without colliding with existing times.
+IMPORTANT ON PRICING: Provide a realistic, ground-truth local price in ${currency} (e.g. if currency is INR, realistic Indian prices like 150-1200; if USD/EUR, 10-60; if JPY, 1000-6000). Never overinflate costs.
+
 Return ONLY raw valid JSON (no markdown fences, no extra text):
 {
   "time": "15:00",
@@ -78,11 +86,11 @@ Return ONLY raw valid JSON (no markdown fences, no extra text):
   "description": "1-2 sentences of sensory, inspiring description.",
   "location": "Specific authentic landmark, street, or quarter",
   "duration": "1.5h",
-  "estimatedCost": "45",
+  "estimatedCost": "25",
   "category": "Sightseeing"
 }
 Categories must be one of: "Sightseeing", "Dining", "Stay", "Adventure", "Transport", "Culture & Nightlife", "Relaxation".
-estimatedCost must be a numeric string (e.g. "45") or "Free". Do not include dollar or currency symbols in estimatedCost.`
+estimatedCost must be a numeric string (e.g. "25") or "Free". Do not include dollar or currency symbols in estimatedCost.`
 
     for (const model of CANDIDATE_MODELS) {
       try {

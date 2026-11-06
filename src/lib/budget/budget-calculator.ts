@@ -86,56 +86,294 @@ export interface BudgetInputParams {
   customDailyRateUsd?: number
 }
 
+export interface DestinationEconomicProfile {
+  regionId: "india_south_asia" | "southeast_asia" | "mediterranean_southern_europe" | "east_asia" | "western_europe_americas"
+  regionLabel: string
+  purchasingPowerLabel: string
+  badgeColor: string
+  baseRatesUsd: {
+    budget: number
+    balanced: number
+    luxury: number
+  }
+  dailyRates: {
+    budget: number
+    balanced: number
+    luxury: number
+  }
+  description: string
+}
+
+/**
+ * Real-Time Purchasing Power Parity (PPP) & Destination Economics Engine.
+ * Accurately analyzes regional travel cost structures so prices reflect realistic,
+ * ground-truth expenses rather than inflated Western generic numbers.
+ */
+export function resolveDestinationEconomicProfile(
+  destination?: string,
+  currency: CurrencyCode = "USD"
+): DestinationEconomicProfile {
+  const dest = (destination || "").toLowerCase()
+  const fx = FX_RATES_FROM_USD[currency] || 1.0
+
+  // 1. Domestic India & South Asian Subcontinent
+  const isSouthAsia =
+    dest.includes("india") ||
+    dest.includes("pune") ||
+    dest.includes("mumbai") ||
+    dest.includes("delhi") ||
+    dest.includes("bangalore") ||
+    dest.includes("bengaluru") ||
+    dest.includes("kolhapur") ||
+    dest.includes("goa") ||
+    dest.includes("kerala") ||
+    dest.includes("rajasthan") ||
+    dest.includes("jaipur") ||
+    dest.includes("udaipur") ||
+    dest.includes("jodhpur") ||
+    dest.includes("agra") ||
+    dest.includes("varanasi") ||
+    dest.includes("manali") ||
+    dest.includes("shimla") ||
+    dest.includes("rishikesh") ||
+    dest.includes("ladakh") ||
+    dest.includes("kashmir") ||
+    dest.includes("himalaya") ||
+    dest.includes("maharashtra") ||
+    dest.includes("gujarat") ||
+    dest.includes("tamil nadu") ||
+    dest.includes("chennai") ||
+    dest.includes("hyderabad") ||
+    dest.includes("kolkata") ||
+    dest.includes("nepal") ||
+    dest.includes("kathmandu") ||
+    dest.includes("sri lanka") ||
+    (!dest && currency === "INR")
+
+  if (isSouthAsia) {
+    const baseRatesUsd = { budget: 16, balanced: 36, luxury: 98 }
+    const formatTier = (valUsd: number) => {
+      if (currency === "INR") {
+        // Authentic Indian market norms: ~₹1,400 (budget), ~₹3,200 (balanced), ~₹8,500 (luxury)
+        return Math.round((valUsd * fx) / 100) * 100
+      }
+      return Math.max(5, Math.round((valUsd * fx) / 5) * 5)
+    }
+
+    return {
+      regionId: "india_south_asia",
+      regionLabel: "India & South Asia",
+      purchasingPowerLabel: "High Value Index (Realistically Calibrated)",
+      badgeColor: "emerald",
+      baseRatesUsd,
+      dailyRates: {
+        budget: formatTier(baseRatesUsd.budget),
+        balanced: formatTier(baseRatesUsd.balanced),
+        luxury: formatTier(baseRatesUsd.luxury),
+      },
+      description: "Real-world Indian travel benchmarks: boutique heritage stays, authentic local cuisine, intercity cabs & entry.",
+    }
+  }
+
+  // 2. Southeast Asia (Tropical Sanctuaries)
+  const isSoutheastAsia =
+    dest.includes("bali") ||
+    dest.includes("indonesia") ||
+    dest.includes("thailand") ||
+    dest.includes("bangkok") ||
+    dest.includes("phuket") ||
+    dest.includes("chiang mai") ||
+    dest.includes("vietnam") ||
+    dest.includes("hanoi") ||
+    dest.includes("ho chi minh") ||
+    dest.includes("da nang") ||
+    dest.includes("cambodia") ||
+    dest.includes("siem reap") ||
+    dest.includes("philippines") ||
+    dest.includes("malaysia") ||
+    dest.includes("laos")
+
+  if (isSoutheastAsia) {
+    const baseRatesUsd = { budget: 25, balanced: 55, luxury: 150 }
+    const formatTier = (valUsd: number) => {
+      if (currency === "INR") return Math.round((valUsd * fx) / 100) * 100
+      return Math.max(5, Math.round((valUsd * fx) / 5) * 5)
+    }
+
+    return {
+      regionId: "southeast_asia",
+      regionLabel: "Southeast Asia",
+      purchasingPowerLabel: "High Value Index",
+      badgeColor: "sky",
+      baseRatesUsd,
+      dailyRates: {
+        budget: formatTier(baseRatesUsd.budget),
+        balanced: formatTier(baseRatesUsd.balanced),
+        luxury: formatTier(baseRatesUsd.luxury),
+      },
+      description: "Optimized for SE Asia: lush boutique villas, scooter/cabs, vibrant night markets & island ferries.",
+    }
+  }
+
+  // 3. Mediterranean & Southern Europe
+  const isMediterranean =
+    dest.includes("italy") ||
+    dest.includes("amalfi") ||
+    dest.includes("rome") ||
+    dest.includes("florence") ||
+    dest.includes("venice") ||
+    dest.includes("milan") ||
+    dest.includes("sicily") ||
+    dest.includes("greece") ||
+    dest.includes("santorini") ||
+    dest.includes("mykonos") ||
+    dest.includes("athens") ||
+    dest.includes("crete") ||
+    dest.includes("spain") ||
+    dest.includes("barcelona") ||
+    dest.includes("madrid") ||
+    dest.includes("portugal") ||
+    dest.includes("lisbon") ||
+    dest.includes("porto") ||
+    dest.includes("turkey") ||
+    dest.includes("croatia")
+
+  if (isMediterranean) {
+    const baseRatesUsd = { budget: 48, balanced: 110, luxury: 260 }
+    const formatTier = (valUsd: number) => {
+      if (currency === "INR") return Math.round((valUsd * fx) / 500) * 500
+      if (currency === "EUR") return Math.round((valUsd * fx) / 5) * 5
+      return Math.max(5, Math.round((valUsd * fx) / 5) * 5)
+    }
+
+    return {
+      regionId: "mediterranean_southern_europe",
+      regionLabel: "Mediterranean & Southern Europe",
+      purchasingPowerLabel: "Moderate European Index",
+      badgeColor: "amber",
+      baseRatesUsd,
+      dailyRates: {
+        budget: formatTier(baseRatesUsd.budget),
+        balanced: formatTier(baseRatesUsd.balanced),
+        luxury: formatTier(baseRatesUsd.luxury),
+      },
+      description: "Calibrated for coastal Mediterranean living: cliffside B&Bs, trattorias, coastal transit & museum entry.",
+    }
+  }
+
+  // 4. Japan & East Asia
+  const isEastAsia =
+    dest.includes("japan") ||
+    dest.includes("tokyo") ||
+    dest.includes("kyoto") ||
+    dest.includes("osaka") ||
+    dest.includes("hokkaido") ||
+    dest.includes("korea") ||
+    dest.includes("seoul") ||
+    dest.includes("taiwan") ||
+    dest.includes("taipei")
+
+  if (isEastAsia) {
+    const baseRatesUsd = { budget: 46, balanced: 115, luxury: 275 }
+    const formatTier = (valUsd: number) => {
+      if (currency === "JPY") return Math.round((valUsd * fx) / 500) * 500
+      if (currency === "INR") return Math.round((valUsd * fx) / 500) * 500
+      return Math.max(5, Math.round((valUsd * fx) / 5) * 5)
+    }
+
+    return {
+      regionId: "east_asia",
+      regionLabel: "Japan & East Asia",
+      purchasingPowerLabel: "Mid-High Index",
+      badgeColor: "purple",
+      baseRatesUsd,
+      dailyRates: {
+        budget: formatTier(baseRatesUsd.budget),
+        balanced: formatTier(baseRatesUsd.balanced),
+        luxury: formatTier(baseRatesUsd.luxury),
+      },
+      description: "Authentic East Asian indices: traditional ryokans, high-speed rail, artisan gastronomy & cultural permits.",
+    }
+  }
+
+  // 5. Western Europe & Global Premium Destinations
+  const baseRatesUsd = { budget: 60, balanced: 135, luxury: 320 }
+  const formatTier = (valUsd: number) => {
+    if (currency === "INR") return Math.round((valUsd * fx) / 500) * 500
+    if (currency === "JPY") return Math.round((valUsd * fx) / 500) * 500
+    return Math.max(5, Math.round((valUsd * fx) / 5) * 5)
+  }
+
+  return {
+    regionId: "western_europe_americas",
+    regionLabel: "Western Europe & Global Destinations",
+    purchasingPowerLabel: "Standard International Index",
+    badgeColor: "rose",
+    baseRatesUsd,
+    dailyRates: {
+      budget: formatTier(baseRatesUsd.budget),
+      balanced: formatTier(baseRatesUsd.balanced),
+      luxury: formatTier(baseRatesUsd.luxury),
+    },
+    description: "Realistic international standards: centrally located hotels, curated dining, panoramic rail & tours.",
+  }
+}
+
+export interface EqualSplitBreakdown {
+  totalBudget: number
+  travelers: number
+  daysCount: number
+  currency: CurrencyCode
+  symbol: string
+  perPersonTotal: number
+  dailyPerPerson: number
+  dailyGroupTotal: number
+}
+
+/**
+ * Calculates equal cost division per member/traveler with 100% mathematical precision.
+ */
+export function calculateEqualSplit(
+  totalBudget: number,
+  travelers: number,
+  daysCount: number,
+  currency: CurrencyCode = "USD"
+): EqualSplitBreakdown {
+  const t = Math.max(1, Math.round(travelers || 1))
+  const d = Math.max(1, Math.round(daysCount || 1))
+  const total = Math.max(0, Math.round(totalBudget || 0))
+  const perPersonTotal = Math.round(total / t)
+  const dailyPerPerson = Math.round(total / (t * d))
+  const dailyGroupTotal = Math.round(total / d)
+
+  return {
+    totalBudget: total,
+    travelers: t,
+    daysCount: d,
+    currency,
+    symbol: CURRENCY_SYMBOLS[currency] || "$",
+    perPersonTotal,
+    dailyPerPerson,
+    dailyGroupTotal,
+  }
+}
+
 /**
  * Determine a realistic USD daily rate baseline per person based on destination and tier.
  * Never hardcodes city-specific prices, but respects regional purchasing power.
  */
 function resolveBaseDailyUsd(destination: string | undefined, tier: BudgetTier, currency: CurrencyCode): number {
-  const destLower = (destination || "").toLowerCase()
-  
-  // Detect domestic India context (either destination mentions India/states or user defaults to INR without explicit overseas dest)
-  const isIndianSubcontinent =
-    destLower.includes("india") ||
-    destLower.includes("pune") ||
-    destLower.includes("mumbai") ||
-    destLower.includes("delhi") ||
-    destLower.includes("bangalore") ||
-    destLower.includes("bengaluru") ||
-    destLower.includes("kolhapur") ||
-    destLower.includes("goa") ||
-    destLower.includes("kerala") ||
-    destLower.includes("rajasthan") ||
-    destLower.includes("jaipur") ||
-    destLower.includes("maharashtra") ||
-    destLower.includes("himalaya") ||
-    destLower.includes("manali") ||
-    destLower.includes("varanasi") ||
-    destLower.includes("agra")
-
-  if (isIndianSubcontinent) {
-    // Realistic Indian domestic tourism norms (~₹2,000–₹12,000 / day / person in INR)
-    switch (tier) {
-      case "budget":
-        return 25 // ~₹2,160 / day per person
-      case "moderate":
-        return 50 // ~₹4,325 / day per person
-      case "luxury":
-        return 140 // ~₹12,110 / day per person
-      case "ultra-luxury":
-        return 320 // ~₹27,680 / day per person
-    }
-  }
-
-  // Western Europe / North America / Japan / Global international baseline
+  const profile = resolveDestinationEconomicProfile(destination, currency)
   switch (tier) {
     case "budget":
-      return 65
-    case "moderate":
-      return 135
+      return profile.baseRatesUsd.budget
     case "luxury":
-      return 340
+      return profile.baseRatesUsd.luxury
     case "ultra-luxury":
-      return 850
+      return profile.baseRatesUsd.luxury * 1.8
+    case "moderate":
+    default:
+      return profile.baseRatesUsd.balanced
   }
 }
 

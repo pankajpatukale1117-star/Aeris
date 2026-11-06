@@ -81,7 +81,7 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { useTravelStore, StoredTrip } from "@/lib/store/travel-store"
 import { DESTINATIONS } from "@/lib/constants"
-import { formatCurrency, CurrencyCode } from "@/lib/budget/budget-calculator"
+import { formatCurrency, CurrencyCode, resolveDestinationEconomicProfile, calculateEqualSplit, CURRENCY_SYMBOLS } from "@/lib/budget/budget-calculator"
 import { ParsedActivity } from "@/lib/planner/quick-add-parser"
 import { DayTemplate, QuickStamp } from "@/lib/planner/day-templates"
 import { exportToICalendar } from "@/lib/planner/calendar-exporter"
@@ -101,7 +101,11 @@ const CURRENCIES: Array<{ code: CurrencyCode; symbol: string; rate: number; labe
   { code: "USD", symbol: "$", rate: 1.0, label: "$ USD" },
   { code: "INR", symbol: "₹", rate: 86.5, label: "₹ INR" },
   { code: "EUR", symbol: "€", rate: 0.92, label: "€ EUR" },
+  { code: "GBP", symbol: "£", rate: 0.79, label: "£ GBP" },
   { code: "JPY", symbol: "¥", rate: 152.0, label: "¥ JPY" },
+  { code: "AUD", symbol: "A$", rate: 1.55, label: "A$ AUD" },
+  { code: "CAD", symbol: "C$", rate: 1.40, label: "C$ CAD" },
+  { code: "CHF", symbol: "CHF", rate: 0.90, label: "CHF" },
 ]
 
 const CATEGORY_OPTIONS = [
@@ -473,15 +477,19 @@ function ManualPlannerContent() {
     })
   }
 
+  // Real-Time Destination Economic Profile & Purchasing Power Parity
+  const economicProfile = React.useMemo(() => {
+    return resolveDestinationEconomicProfile(destination, currency)
+  }, [destination, currency])
+
   // 1-Click Budget Recalculator based on travel style
   const handleApplyBudgetTier = (tierKey: "budget" | "balanced" | "luxury") => {
-    const tierConfig = DAILY_BUDGET_TIERS[currency] || DAILY_BUDGET_TIERS.USD
-    const rate = tierConfig[tierKey]
+    const rate = economicProfile.dailyRates[tierKey]
     const computedTotal = rate * days.length * travelers
     setBudget(String(computedTotal))
     toast({
-      title: `Applied ${tierKey === "budget" ? "Explorer" : tierKey === "luxury" ? "Luxury" : "Balanced"} Budget`,
-      description: `${currency} ${rate.toLocaleString()}/day × ${days.length} Days × ${travelers} Travelers = ${currency} ${computedTotal.toLocaleString()}`,
+      title: `Applied ${tierKey === "budget" ? "Explorer" : tierKey === "luxury" ? "Luxury" : "Balanced"} Tier`,
+      description: `${currency} ${rate.toLocaleString()}/day × ${days.length} Days × ${travelers} Travelers = ${currency} ${computedTotal.toLocaleString()} (${currency} ${Math.round(computedTotal / travelers).toLocaleString()} per member)`,
     })
   }
 
@@ -564,6 +572,11 @@ function ManualPlannerContent() {
 
   const remainingBudget = numericTargetBudget - totalPlannedCost
   const budgetUtilization = numericTargetBudget > 0 ? (totalPlannedCost / numericTargetBudget) * 100 : 0
+
+  // Equal division breakdown among all customizable members
+  const equalSplit = React.useMemo(() => {
+    return calculateEqualSplit(numericTargetBudget, travelers, days.length, currency)
+  }, [numericTargetBudget, travelers, days.length, currency])
 
   // Category Cost Breakdown
   const categoryBreakdown = React.useMemo(() => {
@@ -1370,18 +1383,18 @@ function ManualPlannerContent() {
         {/* BOTTOM ROW: Currency Switcher & Utility Tools */}
         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
           {/* Currency Toggle */}
-          <div className="flex items-center gap-1 glass-pill p-1 rounded-xl bg-white/5 border border-white/10">
-            {["USD", "INR", "EUR", "JPY"].map((curr) => (
+          <div className="flex items-center gap-1 glass-pill p-1 rounded-xl bg-white/5 border border-white/10 flex-wrap">
+            {CURRENCIES.map((curr) => (
               <button
-                key={curr}
-                onClick={() => setCurrency(curr as CurrencyCode)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                  currency === curr
+                key={curr.code}
+                onClick={() => setCurrency(curr.code)}
+                className={`px-2 py-1 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                  currency === curr.code
                     ? "bg-white/20 text-white font-semibold shadow-sm"
                     : "text-slate-400 hover:text-slate-200"
                 }`}
               >
-                {curr === "INR" ? "₹ INR" : curr === "EUR" ? "€ EUR" : curr === "JPY" ? "¥ JPY" : "$ USD"}
+                {curr.label}
               </button>
             ))}
           </div>
@@ -1580,8 +1593,8 @@ function ManualPlannerContent() {
               </div>
             </div>
 
-            {/* 3. PARTY SIZE & DYNAMIC BUDGET ARCHITECTURE */}
-            <div className="space-y-2 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
+            {/* 3. PARTY SIZE & DYNAMIC BUDGET ARCHITECTURE (CUSTOMIZABLE MEMBERS & EQUAL DIVISION) */}
+            <div className="space-y-2.5 p-4 rounded-2xl bg-white/[0.03] border border-white/10">
               <div className="flex items-center justify-between">
                 <label className="text-[10px] text-[#94a3b8] uppercase tracking-wider font-semibold flex items-center gap-1">
                   <DollarSign className="w-3 h-3 text-emerald-400" />
@@ -1599,44 +1612,68 @@ function ManualPlannerContent() {
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <span className="text-[9px] text-slate-400 block mb-1">Travelers</span>
+                  <span className="text-[9px] text-slate-400 block mb-1">Members (Customizable)</span>
                   <div className="flex items-center gap-1">
-                    {[1, 2, 4].map((num) => (
-                      <button
-                        key={num}
-                        type="button"
-                        onClick={() => setTravelers(num)}
-                        className={`flex-1 py-1.5 rounded-lg text-[10px] font-mono border transition-all cursor-pointer ${
-                          travelers === num
-                            ? "bg-[#38bdf8]/20 text-[#38bdf8] border-[#38bdf8]/40 font-bold"
-                            : "bg-white/5 text-slate-400 border-white/10 hover:text-white"
-                        }`}
-                      >
-                        {num}p
-                      </button>
-                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setTravelers(Math.max(1, travelers - 1))}
+                      disabled={travelers <= 1}
+                      className="w-6 h-7 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-all"
+                    >
+                      -
+                    </button>
+                    <input
+                      type="number"
+                      min={1}
+                      max={99}
+                      value={travelers}
+                      onChange={(e) => setTravelers(Math.max(1, Math.min(99, parseInt(e.target.value) || 1)))}
+                      className="w-10 text-center font-mono text-xs font-bold text-white bg-white/5 border border-white/10 rounded-lg h-7"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setTravelers(Math.min(50, travelers + 1))}
+                      disabled={travelers >= 50}
+                      className="w-6 h-7 rounded-lg bg-white/10 hover:bg-white/20 disabled:opacity-30 text-white flex items-center justify-center font-bold text-xs cursor-pointer transition-all"
+                    >
+                      +
+                    </button>
                   </div>
                 </div>
 
                 <div>
-                  <span className="text-[9px] text-slate-400 block mb-1">Budget ({currentCurrency.symbol})</span>
+                  <span className="text-[9px] text-slate-400 block mb-1">Total Budget ({currentCurrency.symbol})</span>
                   <input
                     type="number"
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
-                    className="w-full glass-input rounded-xl h-8 px-2 text-xs text-white font-mono"
+                    className="w-full glass-input rounded-xl h-7 px-2 text-xs text-white font-mono font-bold"
                     placeholder="3000"
                   />
                 </div>
               </div>
 
-              {/* 1-Click Budget Architecture Recalculators */}
+              {/* EQUALLY DIVIDED TELEMETRY PILL */}
+              <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-[10px] space-y-1">
+                <div className="flex items-center justify-between text-emerald-300 font-semibold">
+                  <span className="flex items-center gap-1">
+                    <Users className="w-3 h-3 text-emerald-400" />
+                    Equally Divided ({travelers} {travelers === 1 ? "Member" : "Members"}):
+                  </span>
+                  <span className="font-mono text-emerald-300 font-bold">{formatCurrency(equalSplit.perPersonTotal, currency)} / member</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Daily allowance per member:</span>
+                  <span className="font-mono text-[#38bdf8] font-bold">{formatCurrency(equalSplit.dailyPerPerson, currency)} / day</span>
+                </div>
+              </div>
+
+              {/* 1-Click Budget Architecture Recalculators using Real-Time Economic Profile */}
               <div className="pt-1 space-y-1">
                 <div className="flex items-center justify-between text-[9px] text-slate-400">
-                  <span className="uppercase tracking-widest font-mono">1-Click Tier Recalc:</span>
+                  <span className="uppercase tracking-widest font-mono">Real-Time Analyzed Rates:</span>
                   <span className="font-mono text-[#e8d5b5]">
-                    {currentCurrency.symbol}
-                    {Math.round(numericTargetBudget / Math.max(1, days.length))}/day
+                    {economicProfile.regionLabel}
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-1">
@@ -1644,25 +1681,28 @@ function ManualPlannerContent() {
                     type="button"
                     onClick={() => handleApplyBudgetTier("budget")}
                     className="px-1.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-[9px] text-slate-300 hover:text-white cursor-pointer transition-all text-center"
-                    title="Explorer tier (~$90/day/person)"
+                    title={`Explorer: ${formatCurrency(economicProfile.dailyRates.budget, currency)}/day`}
                   >
-                    Explorer
+                    <div>Explorer</div>
+                    <div className="font-mono text-[8px] text-[#38bdf8]">{formatCurrency(economicProfile.dailyRates.budget, currency)}/d</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleApplyBudgetTier("balanced")}
                     className="px-1.5 py-1 rounded-lg bg-[#38bdf8]/10 hover:bg-[#38bdf8]/20 border border-[#38bdf8]/30 text-[9px] text-[#38bdf8] font-semibold cursor-pointer transition-all text-center"
-                    title="Balanced tier (~$250/day/person)"
+                    title={`Balanced: ${formatCurrency(economicProfile.dailyRates.balanced, currency)}/day`}
                   >
-                    Balanced ★
+                    <div>Balanced ★</div>
+                    <div className="font-mono text-[8px] text-[#e8d5b5]">{formatCurrency(economicProfile.dailyRates.balanced, currency)}/d</div>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleApplyBudgetTier("luxury")}
                     className="px-1.5 py-1 rounded-lg bg-[#e8d5b5]/10 hover:bg-[#e8d5b5]/20 border border-[#e8d5b5]/30 text-[9px] text-[#e8d5b5] cursor-pointer transition-all text-center"
-                    title="Luxury tier (~$650/day/person)"
+                    title={`Luxury: ${formatCurrency(economicProfile.dailyRates.luxury, currency)}/day`}
                   >
-                    Luxury
+                    <div>Luxury</div>
+                    <div className="font-mono text-[8px] text-emerald-400">{formatCurrency(economicProfile.dailyRates.luxury, currency)}/d</div>
                   </button>
                 </div>
               </div>
@@ -1710,10 +1750,16 @@ function ManualPlannerContent() {
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-semibold text-white">
                   Planned: <span className="text-[#38bdf8] font-mono">{formatCurrency(totalPlannedCost, currency)}</span>
+                  <span className="text-slate-400 font-normal text-[10px] ml-1">
+                    ({formatCurrency(totalPlannedCost / travelers, currency)}/m)
+                  </span>
                 </span>
                 <span className="text-xs text-white/30">•</span>
                 <span className="text-xs text-slate-300">
                   Target: <span className="font-mono text-white">{formatCurrency(numericTargetBudget, currency)}</span>
+                  <span className="text-slate-400 font-normal text-[10px] ml-1">
+                    ({formatCurrency(numericTargetBudget / travelers, currency)}/m)
+                  </span>
                 </span>
                 <span
                   className={`text-[9px] font-mono px-2 py-0.5 rounded-full border ${
@@ -1726,7 +1772,7 @@ function ManualPlannerContent() {
                 >
                   {remainingBudget < 0
                     ? `${formatCurrency(Math.abs(remainingBudget), currency)} over budget`
-                    : `${formatCurrency(remainingBudget, currency)} remaining`}
+                    : `${formatCurrency(remainingBudget, currency)} remaining (${formatCurrency(remainingBudget / travelers, currency)}/m)`}
                 </span>
               </div>
             </div>
@@ -1768,9 +1814,49 @@ function ManualPlannerContent() {
           />
         </div>
 
-        {/* Expandable Category Pills */}
+        {/* Expandable Category Pills & Equal Division Breakdown */}
         {isBudgetExpanded && (
-          <div className="pt-2 border-t border-white/5 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2 animate-reveal">
+          <div className="pt-2 border-t border-white/5 space-y-3 animate-reveal">
+            {/* Equally Divided Cost Split Card */}
+            <div className="p-3.5 rounded-xl bg-white/[0.03] border border-white/10 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-white flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-amber-400" />
+                  Equally Divided Cost Split ({travelers} {travelers === 1 ? "Member" : "Members"}):
+                </span>
+                <span className="text-[10px] text-emerald-400 font-mono">
+                  100% Equal Contribution
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1">
+                <div className="p-2 rounded-lg bg-black/30 border border-white/5">
+                  <span className="text-slate-400 text-[9px] block">Target Share:</span>
+                  <span className="font-mono text-white font-bold">{formatCurrency(equalSplit.perPersonTotal, currency)}</span>
+                  <span className="text-[9px] text-slate-500 block">/ member total</span>
+                </div>
+                <div className="p-2 rounded-lg bg-black/30 border border-white/5">
+                  <span className="text-slate-400 text-[9px] block">Planned Share:</span>
+                  <span className="font-mono text-[#38bdf8] font-bold">{formatCurrency(totalPlannedCost / travelers, currency)}</span>
+                  <span className="text-[9px] text-slate-500 block">/ member so far</span>
+                </div>
+                <div className="p-2 rounded-lg bg-black/30 border border-white/5">
+                  <span className="text-slate-400 text-[9px] block">Remaining Share:</span>
+                  <span className={`font-mono font-bold ${remainingBudget < 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                    {formatCurrency(remainingBudget / travelers, currency)}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block">/ member left</span>
+                </div>
+                <div className="p-2 rounded-lg bg-black/30 border border-white/5">
+                  <span className="text-slate-400 text-[9px] block">Daily Allowance:</span>
+                  <span className="font-mono text-[#e8d5b5] font-bold">
+                    {formatCurrency(equalSplit.dailyPerPerson, currency)}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block">/ member / day</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
             {[
               { cat: "Stay", label: "Stays", icon: "🏨" },
               { cat: "Dining", label: "Dining", icon: "🍷" },
@@ -1795,6 +1881,7 @@ function ManualPlannerContent() {
                 </div>
               )
             })}
+            </div>
           </div>
         )}
       </div>
